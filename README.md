@@ -4,9 +4,10 @@ An inertia-heavy missile flight prototype with grapple-hook traversal.
 **Stack: Vite + Three.js + Rapier3D** (`@dimforge/rapier3d-compat`).
 
 You are the missile. You have enormous momentum, no brakes and no regrets:
-steer with the mouse, burn the engine to build speed, grapple-hook through
-gaps you cannot survive otherwise, and hit the red target sphere at the end
-of the course. Touch anything solid and you explode — then you fly again.
+steer with the mouse (or your thumb), burn the engine to build speed,
+grapple-hook through gaps you cannot survive otherwise, and hit the red
+target sphere at the end of the course. Touch anything solid and you
+explode — then you fly again.
 
 ## Run it
 
@@ -22,36 +23,58 @@ npm run build      # -> dist/
 npm run preview
 ```
 
+Regenerate the standalone single-file build (fully offline, no CDN):
+
+```bash
+node scripts/build-standalone.mjs   # -> dist-standalone/dumbfire.html
+```
+
 Smoke-test the physics API usage (no browser needed):
 
 ```bash
 npm run test:physics
 ```
 
-## Controls
+## Levels
+
+Three courses, selected from the in-game menu (click a card or press 1/2/3).
+Each keeps its own best time in `localStorage`.
+
+1. **PILLAR RUN** — day-lit industrial training grounds: girder gate,
+   pillar slalom, window wall, half pyramid, slope + arch, kicker ramp,
+   target tower.
+2. **RED CANYON** — sunset serpentine slot: rock fins, a narrow slot,
+   a tunnel, an open bowl with a grapple spire, a natural arch, then a dive
+   into the pit where the target sits on a low spire.
+3. **SKY GAUNTLET** — dusk chain of floating islands over an abyss:
+   gaps that need thrust + boost, a beam bridge, a central monolith to
+   swing around, a pumphouse fly-through and stepping stones. Falling is
+   a crash; the grapple is not optional.
+
+## Controls — desktop
 
 | Input | Action |
 |---|---|
 | Mouse move | steer (pitch / yaw) |
-| SPACE | main thrust |
+| SPACE | main thrust / launch |
 | LMB | grapple fire / release |
 | SHIFT | super boost (0.6 s burn, 3.2 s cooldown) |
 | RMB | bullet-time toggle |
 | S | drag chute (hold) |
-| R | restart run |
+| R | restart level |
+| ESC | pause mid-flight / back to the level menu |
+| 1 / 2 / 3 | pick level (menu) |
+| N / M | next level / menu (after completion) |
 
-## The single test level
+## Controls — mobile (touch devices, auto-detected)
 
-A linear course flown toward −Z:
+- **Left thumb**: floating virtual joystick — steer
+- **Right thumb cluster**: THRUST (hold), BOOST, HOOK, CHUTE (hold), SLO-MO
+- **Top right**: RESET / MENU
+- Force touch mode on desktop for testing: append `?touch=1` to the URL
 
-1. **Launch pad** — missile spawns here, first SPACE press releases it
-2. **Girder gate** — two towers and a beam wall with a centre gap
-3. **Pillar slalom** — staggered concrete pillars + cross girders (grapple rails)
-4. **The window wall** — full-width wall with a 6×6 m hole to thread
-5. **Half pyramid** — stacked blocks: thread, climb or sling around it
-6. **Slope + arch** — steep ramp you can surf with the grapple, fly under the arch
-7. **Kicker ramp** — launches you upward toward the finish
-8. **Target tower** — red glowing sphere on top; hit it to stop the clock
+Mobile also gets an automatic quality profile (capped pixel ratio, 1024px
+shadow map, halved particle pools, reduced decoration props).
 
 ## Mechanics notes
 
@@ -64,9 +87,12 @@ A linear course flown toward −Z:
 - **Bullet-time.** The world keeps stepping at 60 Hz, but every step is
   multiplied by a smoothed time scale (~0.28×). The run timer always counts
   real seconds — slow motion buys control, never a better time.
+- **Feel.** Speed-based camera pull-back and FOV, roll-lean into turns,
+  boost ignition kick + rumble, cinematic slow-mo fireball after a crash,
+  pause-on-Esc (pointer lock loss freezes the sim and the clock).
 - **Crash / complete.** Rapier collision events are routed by collider tag;
   `missile × level` → explosion + auto-restart after 1.8 s, `missile × target`
-  → level complete with the run time.
+  → level complete with the run time, best time and next-level button.
 
 ## Project structure
 
@@ -75,36 +101,44 @@ dumbfire/
 ├── index.html
 ├── vite.config.js
 ├── scripts/rapier-smoke.mjs      # node smoke test for the Rapier API usage
+├── scripts/build-standalone.mjs  # esbuild single-file generator
 └── src/
     ├── main.js                  # boot: init Rapier, wire modules, start Game
     ├── config.js                # EVERY tuning constant lives here
     ├── physics/PhysicsWorld.js  # Rapier wrapper: fixed step + time scaling + events + raycast
-    ├── input/InputManager.js    # pointer lock, key/mouse state and edges
-    ├── entities/Missile.js      # rigid body, mouse-look steering, thrust impulses
+    ├── input/InputManager.js    # pointer lock, key/mouse state, virtual keys
+    ├── input/TouchControls.js   # on-screen joystick + button cluster (mobile)
+    ├── entities/Missile.js      # rigid body, steering, thrust, detailed model
     ├── abilities/
     │   ├── GrappleHook.js       # raycast attach + rope constraint
     │   ├── Boost.js             # timed burst state machine
     │   ├── BulletTime.js        # smoothed global time scale
     │   └── DragChute.js         # damping brake + chute visual
     ├── scene/
-    │   ├── GameScene.js         # renderer / lights / fog / resize
-    │   ├── Level.js             # the course: meshes + colliders from one box list
-    │   ├── CameraRig.js         # chase cam, FOV kicks, trauma shake
-    │   ├── Effects.js           # exhaust / explosions / fireworks facade
-    │   └── particles.js         # pooled THREE.Points with a tiny shader
-    ├── ui/HUD.js + hud.css      # DOM overlay: timer, chips, crosshair, overlays
-    └── game/Game.js             # state machine + main loop
+    │   ├── GameScene.js         # renderer / lights / fog / per-level palette
+    │   ├── Skybox.js             # shader sky dome + mountains + drifting clouds
+    │   ├── textures.js           # procedural canvas textures (concrete/girder/hazard)
+    │   ├── Level.js              # data-driven course builder (disposeable)
+    │   ├── levels/level1.js      # PILLAR RUN
+    │   ├── levels/level2.js      # RED CANYON
+    │   ├── levels/level3.js      # SKY GAUNTLET
+    │   ├── CameraRig.js          # chase cam, FOV/pull-back/roll-lean, trauma shake
+    │   ├── Effects.js            # exhaust / explosions / fireworks facade
+    │   └── particles.js           # pooled THREE.Points with a tiny shader
+    ├── ui/HUD.js + hud.css       # DOM overlay: menu, timer, chips, touch UI
+    └── game/Game.js              # state machine + level loading + main loop
 ```
 
 ## Standalone single-file build
 
-`standalone/dumbfire.html` is the same game flattened into one HTML file
-(all modules inlined, three.js and Rapier3D loaded from a CDN import map).
-Save it anywhere and open it in a browser — no build step, no server needed
-(requires internet access for the CDN).
+`standalone/dumbfire.html` is the whole game (engine included, Rapier WASM
+inlined) flattened into one HTML file. Save it anywhere and open it in a
+browser — no build step, no server, no internet needed. Regenerate after
+source changes with `node scripts/build-standalone.mjs`.
 
 ## Tuning
 
 All gameplay feel lives in `src/config.js` — thrust, boost, rope recovery,
-camera lag, particle rates, bounds, restart delay. Change a number, save,
-and Vite hot-reloads.
+camera lag, particle rates, restart delay, touch-stick response. Level
+layout, palette and bounds live in `src/scene/levels/*.js`. Change a number,
+save, and Vite hot-reloads.

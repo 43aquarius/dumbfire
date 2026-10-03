@@ -4,9 +4,11 @@
  * Sits above and behind the missile (offset applied in missile space so it
  * follows pitch too), looks at a point ahead of the nose, and adds:
  *  - exponential smoothing (position slower than look-at -> speed sensation)
- *  - FOV kicks: thrust, boost and bullet-time each pull the field of view
+ *  - speed-based pull-back: the camera drifts further back as you accelerate
+ *  - FOV kicks: thrust, boost, bullet-time and raw speed each pull the FOV
+ *  - roll-lean: the whole camera banks with the missile's turn (up-vector tilt)
  *  - trauma-based camera shake (crashes, boost rumble)
- *  - a slow orbit around the crash/target point for the end-of-run views
+ *  - slow orbits for the menu / crash / target end-of-run views
  */
 import * as THREE from 'three'
 import { CFG } from '../config.js'
@@ -25,6 +27,7 @@ export class CameraRig {
     this.trauma = 0
     this._shakeT = 0
     this._orbit = 0
+    this._lean = 0
     this.fov = CFG.camera.fovBase
 
     // Start framed on the missile waiting on the pad
@@ -37,25 +40,44 @@ export class CameraRig {
   /** Add a unitless amount of shake (0..1). Squared when applied. */
   addTrauma (v) { this.trauma = Math.min(1, this.trauma + v) }
 
+  /** Snap directly onto the missile (used right after a level load). */
+  snapTo (missile) {
+    _off.set(CFG.camera.offset.x, CFG.camera.offset.y, CFG.camera.offset.z)
+      .applyQuaternion(missile.quaternion)
+    this.pos.copy(missile.position).add(_off)
+    this.look.copy(missile.position)
+    this._orbit = 0
+  }
+
   /**
    * @param {number} dt real dt
-   * @param {object} ctx { missile, state, focus, thrusting, boostActive, slowmo }
+   * @param {object} ctx { missile, state, focus, thrusting, boostActive,
+   *                       slowmo, speed, bank }
    */
   update (dt, ctx) {
     let posLerp, lookLerp
 
-    if (ctx.state === 'crashed' || ctx.state === 'complete') {
-      // Slow orbit around the explosion / target
-      this._orbit += dt * 0.3
-      _desiredPos.set(Math.cos(this._orbit) * 26, 10, Math.sin(this._orbit) * 26)
+    if (ctx.state === 'menu' || ctx.state === 'crashed' || ctx.state === 'complete') {
+      // Slow orbit around the focus point (target / crash / menu backdrop)
+      this._orbit += dt * (ctx.state === 'menu' ? 0.12 : 0.3)
+      const radius = ctx.state === 'menu' ? CFG.camera.menuRadius : 26
+      const height = ctx.state === 'menu' ? CFG.camera.menuHeight : 10
+      _desiredPos.set(Math.cos(this._orbit) * radius, height, Math.sin(this._orbit) * radius)
         .add(ctx.focus)
       _desiredLook.copy(ctx.focus)
       posLerp = 1 - Math.exp(-2.5 * dt)
       lookLerp = 1 - Math.exp(-4 * dt)
+      this._lean = THREE.MathUtils.damp(this._lean, 0, 4, dt)
     } else {
       const m = ctx.missile
-      _off.set(CFG.camera.offset.x, CFG.camera.offset.y, CFG.camera.offset.z)
-        .applyQuaternion(m.quaternion)
+      // speed-based pull-back — camera trails further out at high speed
+      const pull = CFG.camera.pullbackMax *
+        Math.min(1, (ctx.speed || 0) / CFG.camera.pullbackSpeed)
+      _off.set(
+        CFG.camera.offset.x,
+        CFG.camera.offset.y,
+        CFG.camera.offset.z + pull
+      ).applyQuaternion(m.quaternion)
       _desiredPos.copy(m.position).add(_off)
       _desiredLook.copy(m.position).addScaledVector(m.forward(_fwd), CFG.camera.lookAhead)
       posLerp = 1 - Math.exp(-CFG.camera.posLerp * dt)
@@ -74,13 +96,22 @@ export class CameraRig {
     const oy = (Math.sin(this._shakeT * 2.3 + 2) + 0.6 * Math.sin(this._shakeT * 4.7)) * 1.1 * s
 
     this.cam.position.set(this.pos.x + ox, this.pos.y + oy, this.pos.z)
+
+    // Roll-lean: tilt the up-vector into the missile's bank so turns feel
+    // weighty without ever disorienting (kept well below the missile's own roll)
+    if (ctx.state === 'flying' || ctx.state === 'ready') {
+      this._lean = THREE.MathUtils.damp(this._lean, -(ctx.bank || 0) * CFG.camera.rollLean, 6, dt)
+    }
+    this.cam.up.set(Math.sin(this._lean), Math.cos(this._lean), 0)
     this.cam.lookAt(this.look)
 
-    // FOV state
+    // FOV state — thrust / boost / bullet-time / raw speed
     let targetFov = CFG.camera.fovBase
     if (ctx.boostActive) targetFov = CFG.camera.fovBoost
     else if (ctx.thrusting) targetFov = CFG.camera.fovThrust
     if (ctx.slowmo) targetFov += CFG.camera.fovSlowmoDelta
+    targetFov += CFG.camera.fovSpeedMax *
+      Math.min(1, (ctx.speed || 0) / CFG.camera.pullbackSpeed)
     this.fov = THREE.MathUtils.damp(this.fov, targetFov, 5, dt)
     this.cam.fov = this.fov
     this.cam.updateProjectionMatrix()

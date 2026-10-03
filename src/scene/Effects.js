@@ -6,7 +6,7 @@
  *  - red firework burst (target destroyed)
  *
  * All bursts share one "burst" pool; the exhaust has its own so a long trail
- * never starves explosions.
+ * never starves explosions. Pool sizes scale down on touch devices.
  */
 import * as THREE from 'three'
 import { ParticleSystem } from './particles.js'
@@ -38,10 +38,11 @@ export class Effects {
   constructor (gameScene) {
     const scene = gameScene.scene
     this.scene = scene
+    const fx = CFG.quality.fxScale
 
-    this.exhaust = new ParticleSystem(scene, 900, { gravity: -1.5, drag: 0.8 })
-    this.puffs = new ParticleSystem(scene, 300, { gravity: -0.8, drag: 0.6 })
-    this.burst = new ParticleSystem(scene, 500, { gravity: -22, drag: 1.6 })
+    this.exhaust = new ParticleSystem(scene, Math.round(900 * fx), { gravity: -1.5, drag: 0.8 })
+    this.puffs = new ParticleSystem(scene, Math.round(300 * fx), { gravity: -0.8, drag: 0.6 })
+    this.burst = new ParticleSystem(scene, Math.round(500 * fx), { gravity: -22, drag: 1.6 })
 
     // Single reusable flash light for explosions / fireworks
     this.flash = new THREE.PointLight(0xffa050, 0, 160, 2)
@@ -115,7 +116,8 @@ export class Effects {
 
   /** Crash: fireball + flash + lingering embers. */
   explosionAt (p) {
-    this._spawnBurst(p, CFG.explosion.count, 6, 55, FIRE_COLORS, 0.7, 2.6)
+    const n = Math.round(CFG.explosion.count * CFG.quality.fxScale)
+    this._spawnBurst(p, n, 6, 55, FIRE_COLORS, 0.7, 2.6)
     this.flash.position.copy(p)
     this.flash.color.set(0xffa050)
     this._flashI = CFG.explosion.flashIntensity

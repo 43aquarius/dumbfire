@@ -1,5 +1,7 @@
 /**
- * InputManager — pointer lock, keyboard state and mouse edge events.
+ * InputManager — pointer lock, keyboard state, mouse edge events,
+ * plus a virtual key layer that the on-screen touch controls write into
+ * (so Game code keeps querying plain key codes regardless of input source).
  *
  * Responsibilities:
  *  - own the browser event listeners (keyboard, mouse, pointer lock)
@@ -43,6 +45,13 @@ export class InputManager {
 
     /** Accumulated mouse movement while locked. */
     this.mouse = { dx: 0, dy: 0 }
+
+    /** Virtual key layer written by the on-screen touch controls. */
+    this.vKeys = new Set()
+    this.vPressed = new Set()
+
+    /** True when the game runs in touch mode (no pointer lock at all). */
+    this.touchMode = false
 
     this.locked = false
     /** Optional callback, fired with (locked:boolean) on pointerlockchange. */
@@ -116,14 +125,23 @@ export class InputManager {
     } catch (_) { /* browser may throttle re-locking right after Esc */ }
   }
 
-  /** Is a key currently held? */
-  isDown (code) { return this.keys.has(code) }
+  /** Is a key currently held? (physical OR on-screen touch button) */
+  isDown (code) { return this.keys.has(code) || this.vKeys.has(code) }
 
-  /** Was a key pressed since the last endFrame()? */
-  wasPressed (code) { return this.pressed.has(code) }
+  /** Was a key pressed since the last endFrame()? (physical OR touch) */
+  wasPressed (code) { return this.pressed.has(code) || this.vPressed.has(code) }
 
   /** Was a mouse button pressed since the last endFrame()? */
   wasButtonPressed (button) { return this.buttonPressed.has(button) }
+
+  /** Virtual key DOWN (touch button pressed). */
+  vDown (code) {
+    if (!this.vKeys.has(code)) this.vPressed.add(code)
+    this.vKeys.add(code)
+  }
+
+  /** Virtual key UP (touch button released). */
+  vUp (code) { this.vKeys.delete(code) }
 
   /**
    * Drain the accumulated mouse delta and reset it to zero.
@@ -141,5 +159,6 @@ export class InputManager {
     this.pressed.clear()
     this.released.clear()
     this.buttonPressed.clear()
+    this.vPressed.clear()
   }
 }

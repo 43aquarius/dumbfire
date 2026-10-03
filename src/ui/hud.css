@@ -8,13 +8,21 @@
   font-family: ui-monospace, "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
   color: #e8ecf1;
   user-select: none;
+  -webkit-user-select: none;
 }
 
 /* ---------- timer (top-left) ---------- */
 .hud-topleft {
   position: absolute;
-  top: 18px;
-  left: 22px;
+  top: 14px;
+  left: 18px;
+}
+#hud-level {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #ffd24a;
+  opacity: 0.85;
+  margin-bottom: 3px;
 }
 #hud-timer {
   font-size: 30px;
@@ -32,8 +40,8 @@
 /* ---------- ability chips (top-right) ---------- */
 .hud-topright {
   position: absolute;
-  top: 18px;
-  right: 22px;
+  top: 14px;
+  right: 18px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -149,6 +157,7 @@
   flex-direction: column;
   gap: 10px;
   text-align: center;
+  background: rgba(6, 8, 11, 0.35);
 }
 #overlay.show { display: flex; }
 #overlay-title {
@@ -170,7 +179,6 @@
 }
 #overlay.crash #overlay-title { color: #ff5a45; }
 #overlay.win #overlay-title { color: #7dff9a; font-size: 34px; letter-spacing: 6px; }
-#overlay.win #overlay-time { display: block; }
 #overlay:not(.win) #overlay-time { display: none; }
 
 #overlay-controls {
@@ -185,3 +193,265 @@
 }
 #overlay-controls.show { display: grid; }
 #overlay-controls .k { color: #ffd24a; text-align: right; }
+
+/* ---------- win buttons ---------- */
+#win-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+.obtn {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 10px 22px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #e8ecf1;
+  background: rgba(16, 20, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.obtn:hover { border-color: #ffd24a; color: #ffd24a; }
+.obtn.primary {
+  background: #c9522f;
+  border-color: #c9522f;
+  color: #fff;
+}
+.obtn.primary:hover { background: #e06038; border-color: #e06038; }
+
+/* ---------- level select menu ---------- */
+#menu {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+#menu-title {
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: 16px;
+  color: #f2f5f8;
+  text-shadow: 0 6px 24px rgba(0, 0, 0, 0.9);
+}
+#menu-title span { color: #ff6a2b; }
+#menu-sub {
+  font-size: 13px;
+  letter-spacing: 4px;
+  color: rgba(232, 236, 241, 0.65);
+}
+#menu-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(560px, 94vw);
+}
+.card {
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px;
+  text-align: left;
+  background: rgba(14, 18, 24, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transition: border-color 0.15s, transform 0.15s, background 0.15s;
+}
+.card:hover {
+  border-color: #ff6a2b;
+  background: rgba(34, 24, 18, 0.92);
+  transform: translateX(4px);
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.card-idx {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  background: #c9522f;
+}
+.card-name {
+  flex: 1;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #f2f5f8;
+}
+.card-sub {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: rgba(232, 236, 241, 0.6);
+}
+.card-best {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #ffd24a;
+  opacity: 0.9;
+}
+.dots { display: inline-flex; gap: 4px; }
+.dot {
+  width: 8px;
+  height: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  transform: rotate(45deg);
+}
+.dot.full { background: #ff6a2b; border-color: #ff6a2b; }
+#menu-foot {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: rgba(232, 236, 241, 0.45);
+}
+
+/* ---------- on-screen touch controls ---------- */
+#touch-ui { display: none; }
+#touch-ui.on { display: block; }
+
+#joy-zone {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 46%;
+  height: 70%;
+  touch-action: none;
+}
+#joy-base {
+  position: absolute;
+  left: -999px;
+  top: -999px;
+  width: 128px;
+  height: 128px;
+  margin: -64px 0 0 -64px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  background: rgba(10, 14, 18, 0.28);
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+#joy-base.on { opacity: 1; }
+#joy-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  transform: translate(-50%, -50%);
+}
+
+#touch-buttons {
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  width: 190px;
+  height: 190px;
+  touch-action: none;
+}
+.tbtn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: rgba(232, 236, 241, 0.8);
+  background: rgba(10, 14, 18, 0.5);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tbtn.on {
+  background: rgba(255, 106, 43, 0.55);
+  border-color: #ff6a2b;
+  color: #fff;
+}
+#tb-thrust {
+  right: 8px;
+  bottom: 6px;
+  width: 88px;
+  height: 88px;
+  font-size: 13px;
+  border-width: 2px;
+}
+#tb-boost {
+  right: 104px;
+  bottom: 30px;
+  width: 62px;
+  height: 62px;
+}
+#tb-hook {
+  right: 26px;
+  bottom: 104px;
+  width: 66px;
+  height: 66px;
+}
+#tb-chute {
+  right: 118px;
+  bottom: 116px;
+  width: 54px;
+  height: 54px;
+}
+#tb-slowmo {
+  right: 104px;
+  bottom: -8px;
+  width: 50px;
+  height: 50px;
+}
+#tb-corner {
+  position: absolute;
+  top: 64px;
+  right: max(14px, env(safe-area-inset-right));
+  display: flex;
+  gap: 8px;
+}
+.tbtn.mini {
+  position: static;
+  width: 62px;
+  height: 34px;
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+/* ---------- small screens ---------- */
+@media (max-width: 760px) {
+  .hud-topleft { top: 10px; left: 12px; }
+  #hud-timer { font-size: 22px; }
+  #hud-level { font-size: 9px; }
+  #hud-speed { font-size: 10px; }
+  .hud-topright { display: none; }  /* touch buttons replace the chips */
+  #hint { display: none; }
+  #overlay-title { font-size: 30px; letter-spacing: 6px; }
+  #menu-title { font-size: 38px; letter-spacing: 10px; }
+  #menu-sub { font-size: 11px; letter-spacing: 2px; }
+  .card-name { font-size: 16px; }
+  #overlay-time { font-size: 24px; }
+  .obtn { padding: 12px 18px; }
+}
+
+/* ---------- very short landscape phones ---------- */
+@media (max-height: 460px) {
+  #menu { gap: 12px; }
+  #menu-title { font-size: 30px; }
+  .card { padding: 8px 14px; }
+  .card-sub, .card-best { display: none; }
+  #tb-thrust { width: 76px; height: 76px; }
+  #touch-buttons { width: 170px; height: 170px; }
+}

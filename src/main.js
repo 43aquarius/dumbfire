@@ -1,16 +1,17 @@
 /**
  * DUMBFIRE — playable web prototype.
- * Inertia-heavy missile flight + grapple-hook slinging.
+ * Inertia-heavy missile flight + grapple-hook slinging across three courses.
  *
  * Stack: Vite + three.js (rendering) + Rapier3D (physics, compat build).
  *
  * Entry point: boots Rapier's WASM, wires every module together and hands
- * control to the Game loop.
+ * control to the Game loop. Touch devices get the on-screen controls
+ * (force-enable on desktop with ?touch=1 for testing).
  */
 import { PhysicsWorld } from './physics/PhysicsWorld.js'
 import { GameScene } from './scene/GameScene.js'
-import { Level } from './scene/Level.js'
 import { InputManager } from './input/InputManager.js'
+import { TouchControls } from './input/TouchControls.js'
 import { Missile } from './entities/Missile.js'
 import { GrappleHook } from './abilities/GrappleHook.js'
 import { Boost } from './abilities/Boost.js'
@@ -20,23 +21,44 @@ import { Effects } from './scene/Effects.js'
 import { CameraRig } from './scene/CameraRig.js'
 import { HUD } from './ui/HUD.js'
 import { Game } from './game/Game.js'
+import { CFG } from './config.js'
+import { LEVEL_1 } from './scene/levels/level1.js'
+import { LEVEL_2 } from './scene/levels/level2.js'
+import { LEVEL_3 } from './scene/levels/level3.js'
+
+const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3]
+
+// ---- device profile ---------------------------------------------------------
+// Coarse pointer and no fine pointer => touch-first device. Force with ?touch=1.
+const params = new URLSearchParams(location.search)
+const isTouch = params.has('touch') ||
+  (window.matchMedia('(pointer: coarse)').matches &&
+   !window.matchMedia('(pointer: fine)').matches)
+CFG.quality.mobile = isTouch
+CFG.quality.fxScale = isTouch ? 0.5 : 1
+
+// ---- best-run persistence ---------------------------------------------------
+const bestKey = (id) => `dumbfire_best_v1_${id}`
+const getBest = (id) => {
+  const v = parseFloat(localStorage.getItem(bestKey(id)))
+  return Number.isFinite(v) ? v : null
+}
+const setBest = (id, t) => localStorage.setItem(bestKey(id), String(t))
 
 async function main () {
   // Rapier (compat) ships its WASM inlined as base64 — must init before use
   const physics = await PhysicsWorld.create()
 
-  // Rendering scene graph
-  const scene = new GameScene(document.getElementById('app'))
+  // Rendering scene graph (with the procedural sky/mountains/clouds)
+  const scene = new GameScene(document.getElementById('app'), { mobile: isTouch })
 
-  // Static test level (visuals + colliders + target)
-  const level = new Level(physics, scene.scene)
-
-  // Input with pointer lock
+  // Input — pointer lock + keys on desktop, virtual keys from touch UI
   const input = new InputManager(scene.canvas)
+  input.touchMode = isTouch
   input.attach()
 
   // Player entity + abilities
-  const missile = new Missile(physics, scene.scene)
+  const missile = new Missile(physics, scene.scene, { mobile: isTouch })
   const grapple = new GrappleHook(physics, missile, scene.scene)
   const boost = new Boost()
   const bulletTime = new BulletTime()
@@ -45,19 +67,48 @@ async function main () {
   // Presentation layer
   const effects = new Effects(scene)
   const cameraRig = new CameraRig(scene.camera, missile)
-  const hud = new HUD()
 
-  // Pointer lock drives the READY panel text
-  input.onLockChange = (locked) => hud.setPointerLocked(locked)
-
-  // The game loop owns everything from here on
-  const game = new Game({
-    physics, scene, level, input, hud, effects, cameraRig,
-    missile, grapple, boost, bulletTime, chute
+  // HUD first — its callbacks close over `game`, which is assigned right
+  // after; they only ever run on user interaction, by which time it exists.
+  let game
+  const hud = new HUD({
+    mobile: isTouch,
+    levels: LEVELS,
+    getBest,
+    onSelectLevel: (i) => game.selectLevel(i),
+    onNext: () => game.nextLevel(),
+    onRetry: () => game.restart(),
+    onMenu: () => game.toMenu()
   })
 
+  // The game loop owns everything from here on (levels load inside it)
+  game = new Game({
+    physics, scene, input, hud, effects, cameraRig,
+    missile, grapple, boost, bulletTime, chute,
+    levels: LEVELS, getBest, setBest, touch: null
+  })
+
+  // On-screen controls for touch devices (hidden on desktop unless ?touch=1)
+  let touch = null
+  if (isTouch) {
+    touch = new TouchControls(input, {
+      onGrapple: () => game.grappleToggle(),
+      onBulletTime: () => game.bulletTimeToggle(),
+      onReset: () => game.restart(),
+      onMenu: () => game.toMenu()
+    })
+    game.touch = touch
+    touch.setVisible(true) // menu overlays it, but ready/flying need it
+  }
+
+  // Pointer lock drives pause / menu / ready panel text
+  input.onLockChange = (locked) => {
+    hud.setPointerLocked(locked)
+    game.onLockChange(locked)
+  }
+
   // Debug hook — inspect live state from the devtools console, e.g.
-  //   __game.state            -> 'ready' | 'flying' | 'crashed' | 'complete'
+  //   __game.state            -> 'menu' | 'ready' | 'flying' | 'crashed' | 'complete'
   //   __game.missile.position -> current position
   window.__game = game
 }

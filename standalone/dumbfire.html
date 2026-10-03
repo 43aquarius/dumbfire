@@ -1,0 +1,2029 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DUMBFIRE — single-file web prototype</title>
+  <!--
+    DUMBFIRE — single-file build.
+    Same game as the modular Vite project (src/), flattened into one HTML
+    file. three.js and Rapier3D (compat build, WASM inlined as base64) are
+    pulled from a CDN via an import map, so this file is fully standalone:
+    save it anywhere and open it in a browser (needs internet for the CDNs).
+    All gameplay constants live in CFG below, mirroring src/config.js.
+  -->
+  <style>
+    /* ---------- base page (from index.html) ---------- */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #0b0d10;
+    }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+
+    /* ---------- HUD (from src/ui/hud.css) ---------- */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      font-family: ui-monospace, "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+      color: #e8ecf1;
+      user-select: none;
+    }
+
+    /* timer (top-left) */
+    .hud-topleft {
+      position: absolute;
+      top: 18px;
+      left: 22px;
+    }
+    #hud-timer {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+    }
+    #hud-speed {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-top: 2px;
+      letter-spacing: 1px;
+    }
+
+    /* ability chips (top-right) */
+    .hud-topright {
+      position: absolute;
+      top: 18px;
+      right: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-end;
+    }
+    .chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(10, 14, 18, 0.55);
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      color: rgba(232, 236, 241, 0.55);
+      min-width: 150px;
+      justify-content: space-between;
+    }
+    .chip .key {
+      font-size: 9px;
+      opacity: 0.55;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 0 4px;
+    }
+    #chip-thrust.on   { color: #ffb054; border-color: #ffb054; }
+    #chip-boost.on    { color: #ffe066; border-color: #ffe066; }
+    #chip-slowmo.on   { color: #7fd8ff; border-color: #7fd8ff; }
+    #chip-chute.on    { color: #9fb6ff; border-color: #9fb6ff; }
+    #chip-hook.on     { color: #7dff9a; border-color: #7dff9a; }
+    #chip-hook.warn   { color: #ff6b57; border-color: #ff6b57; }
+
+    #chip-boost .bar {
+      position: relative;
+      width: 46px;
+      height: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    #boost-fill {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      background: #ffe066;
+      transform-origin: left;
+    }
+
+    /* crosshair */
+    #crosshair {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 26px;
+      height: 26px;
+      transform: translate(-50%, -50%);
+    }
+    #crosshair .ring {
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(255, 255, 255, 0.75);
+      border-radius: 50%;
+      transition: border-color 0.12s, transform 0.12s;
+    }
+    #crosshair .dot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 3px;
+      height: 3px;
+      background: #fff;
+      transform: translate(-50%, -50%);
+    }
+    #crosshair.hit .ring {
+      border-color: #7dff9a;
+      transform: scale(1.15);
+    }
+    #crosshair.attached .ring {
+      border-color: #7dff9a;
+      transform: scale(0.8);
+    }
+
+    /* controls hint (bottom) */
+    #hint {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      opacity: 0.75;
+      transition: opacity 1.2s;
+      white-space: nowrap;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+    }
+    #hint.faded { opacity: 0.22; }
+    #hint.attention { opacity: 1; color: #ffd24a; }
+
+    /* bullet-time vignette */
+    #vignette {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.25s;
+      background: radial-gradient(ellipse at center, transparent 52%, rgba(40, 90, 200, 0.38) 100%);
+    }
+    #vignette.on { opacity: 1; }
+
+    /* state overlay */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      text-align: center;
+    }
+    #overlay.show { display: flex; }
+    #overlay-title {
+      font-size: 44px;
+      font-weight: 800;
+      letter-spacing: 10px;
+      text-shadow: 0 4px 18px rgba(0, 0, 0, 0.8);
+    }
+    #overlay-sub {
+      font-size: 14px;
+      letter-spacing: 3px;
+      opacity: 0.85;
+    }
+    #overlay-time {
+      font-size: 34px;
+      font-weight: 700;
+      color: #7dff9a;
+      letter-spacing: 2px;
+    }
+    #overlay.crash #overlay-title { color: #ff5a45; }
+    #overlay.win #overlay-title { color: #7dff9a; font-size: 34px; letter-spacing: 6px; }
+    #overlay.win #overlay-time { display: block; }
+    #overlay:not(.win) #overlay-time { display: none; }
+
+    #overlay-controls {
+      margin-top: 14px;
+      display: none;
+      grid-template-columns: auto auto;
+      gap: 4px 18px;
+      font-size: 11px;
+      letter-spacing: 1px;
+      opacity: 0.75;
+      text-align: left;
+    }
+    #overlay-controls.show { display: grid; }
+    #overlay-controls .k { color: #ffd24a; text-align: right; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "@dimforge/rapier3d-compat": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.12.0/+esm"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import * as THREE from 'three'
+    import RAPIER from '@dimforge/rapier3d-compat'
+
+    /* ================================================================
+     * config  (was src/config.js)
+     * ================================================================ */
+    const CFG = {
+      physics: {
+        fixedDt: 1 / 60,
+        maxStepsPerFrame: 5,
+        gravity: -13.0
+      },
+
+      missile: {
+        mass: 110,
+        spawn: { x: 0, y: 10, z: 55 },
+        launchSpeed: 22,
+        thrustAccel: 62,
+        lookSens: 0.0021,
+        maxPitch: 1.48,
+        halfExtents: { x: 0.38, y: 0.38, z: 1.55 },
+        colliderOffsetZ: -0.35
+      },
+
+      boost: {
+        accel: 250,
+        duration: 0.6,
+        cooldown: 3.2
+      },
+
+      bulletTime: {
+        scale: 0.28,
+        lerpRate: 7
+      },
+
+      chute: {
+        linearDamping: 3.0
+      },
+
+      grapple: {
+        maxRange: 120,
+        recover: 10,
+        hardStretch: 1.6
+      },
+
+      camera: {
+        offset: { x: 0, y: 2.4, z: 8.5 },
+        lookAhead: 12,
+        posLerp: 9,
+        lookLerp: 14,
+        fovBase: 74,
+        fovThrust: 79,
+        fovBoost: 90,
+        fovSlowmoDelta: -12,
+        shakeDecay: 1.5
+      },
+
+      bounds: {
+        minX: -70, maxX: 70,
+        minZ: -300, maxZ: 110,
+        maxY: 110
+      },
+
+      trail: {
+        rateIdle: 12,
+        rateThrust: 90,
+        rateBoost: 220
+      },
+
+      explosion: {
+        count: 240,
+        flashIntensity: 320
+      },
+
+      ui: {
+        restartDelay: 1.8,
+        hintFadeAfter: 9
+      }
+    }
+
+    /* ================================================================
+     * physics  (was src/physics/PhysicsWorld.js)
+     * ================================================================ */
+    class PhysicsWorld {
+      static async create () {
+        await RAPIER.init()
+        return new PhysicsWorld()
+      }
+
+      constructor () {
+        this.world = new RAPIER.World({ x: 0, y: CFG.physics.gravity, z: 0 })
+        this.events = new RAPIER.EventQueue(false) // manual drain -> no event loss across sub-steps
+
+        /** collider.handle -> tag ('missile' | 'level' | 'target') */
+        this.tags = new Map()
+
+        /** Collision callback: (handleA, handleB, started) — assigned by the Game. */
+        this.onCollision = null
+
+        this.setStepDt(CFG.physics.fixedDt)
+      }
+
+      /**
+       * Set the dt the world advances per step().
+       * Bullet-time multiplies this so the world runs in slow motion while we
+       * keep stepping at a steady real-time 60 Hz.
+       */
+      setStepDt (dt) {
+        try {
+          if (typeof this.world.timestep === 'number') this.world.timestep = dt
+          else if (this.world.integrationParameters) this.world.integrationParameters.dt = dt
+        } catch (_) { /* keep last known dt */ }
+      }
+
+      step () {
+        this.world.step(this.events)
+      }
+
+      drainCollisions () {
+        if (!this.onCollision) {
+          this.events.drainCollisionEvents(() => {})
+          return
+        }
+        this.events.drainCollisionEvents((h1, h2, started) => {
+          this.onCollision(h1, h2, started)
+        })
+      }
+
+      tag (collider, tag) { this.tags.set(collider.handle, tag) }
+
+      tagOf (handle) { return this.tags.get(handle) }
+
+      createFixedBody () {
+        return this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed())
+      }
+
+      /**
+       * Raycast. Returns { x, y, z, dist, collider } or null.
+       * `excludeBody` (e.g. the missile) is filtered out so the ray can start
+       * inside the missile's own collider without hitting it.
+       */
+      raycast (ox, oy, oz, dx, dy, dz, maxDist, excludeBody) {
+        const ray = new RAPIER.Ray({ x: ox, y: oy, z: oz }, { x: dx, y: dy, z: dz })
+        let hit = null
+        try {
+          hit = this.world.castRay(ray, maxDist, true, undefined, undefined, undefined, excludeBody)
+        } catch (_) {
+          hit = this.world.castRay(ray, maxDist, true)
+        }
+        if (!hit) return null
+        const toi = hit.toi !== undefined ? hit.toi : hit.timeOfImpact
+        if (typeof toi !== 'number') return null
+        return {
+          x: ox + dx * toi,
+          y: oy + dy * toi,
+          z: oz + dz * toi,
+          dist: toi,
+          collider: hit.collider
+        }
+      }
+    }
+
+    /* ================================================================
+     * input  (was src/input/InputManager.js)
+     * ================================================================ */
+    const CODE_ALIASES = {
+      ' ': 'Space',
+      Shift: 'ShiftLeft',
+      s: 'KeyS', S: 'KeyS',
+      r: 'KeyR', R: 'KeyR'
+    }
+
+    const normCode = (e) => e.code || CODE_ALIASES[e.key] || e.key
+
+    class InputManager {
+      constructor (element) {
+        this.element = element
+
+        this.keys = new Set()
+        this.pressed = new Set()
+        this.released = new Set()
+
+        this.buttons = new Set()
+        this.buttonPressed = new Set()
+
+        this.mouse = { dx: 0, dy: 0 }
+
+        this.locked = false
+        this.onLockChange = null
+
+        this._bound = false
+      }
+
+      attach () {
+        if (this._bound) return
+        this._bound = true
+        const el = this.element
+
+        el.addEventListener('click', () => this.requestLock())
+
+        window.addEventListener('keydown', (e) => {
+          const code = normCode(e)
+          if (code === 'Space') e.preventDefault()
+          if (e.repeat) return
+          this.keys.add(code)
+          this.pressed.add(code)
+        })
+
+        window.addEventListener('keyup', (e) => {
+          const code = normCode(e)
+          this.keys.delete(code)
+          this.released.add(code)
+        })
+
+        window.addEventListener('mousedown', (e) => {
+          if (!this.locked) return
+          this.buttons.add(e.button)
+          this.buttonPressed.add(e.button)
+        })
+
+        window.addEventListener('mouseup', (e) => this.buttons.delete(e.button))
+
+        window.addEventListener('mousemove', (e) => {
+          if (!this.locked) return
+          this.mouse.dx += e.movementX
+          this.mouse.dy += e.movementY
+        })
+
+        window.addEventListener('contextmenu', (e) => e.preventDefault())
+
+        document.addEventListener('pointerlockchange', () => {
+          this.locked = document.pointerLockElement === this.element
+          if (!this.locked) {
+            this.keys.clear()
+            this.buttons.clear()
+          }
+          if (this.onLockChange) this.onLockChange(this.locked)
+        })
+
+        window.addEventListener('blur', () => {
+          this.keys.clear()
+          this.buttons.clear()
+        })
+      }
+
+      requestLock () {
+        if (this.locked) return
+        try {
+          const p = this.element.requestPointerLock()
+          if (p && typeof p.catch === 'function') p.catch(() => {})
+        } catch (_) { /* browser may throttle re-locking right after Esc */ }
+      }
+
+      isDown (code) { return this.keys.has(code) }
+
+      wasPressed (code) { return this.pressed.has(code) }
+
+      wasButtonPressed (button) { return this.buttonPressed.has(button) }
+
+      consumeMouseDelta () {
+        const d = { dx: this.mouse.dx, dy: this.mouse.dy }
+        this.mouse.dx = 0
+        this.mouse.dy = 0
+        return d
+      }
+
+      endFrame () {
+        this.pressed.clear()
+        this.released.clear()
+        this.buttonPressed.clear()
+      }
+    }
+
+    /* ================================================================
+     * entities  (was src/entities/Missile.js)
+     * ================================================================ */
+    const _mEuler = new THREE.Euler(0, 0, 0, 'YXZ')
+    const _mQuat = new THREE.Quaternion()
+    const _mFwd = new THREE.Vector3()
+
+    class Missile {
+      constructor (physics, scene) {
+        this.physics = physics
+        this.scene = scene
+
+        // --- steering state ----------------------------------------------
+        this.yaw = 0       // around world +Y
+        this.pitch = 0     // around local +X, clamped to avoid gimbal flip
+        this._prevYaw = 0  // for banking visual
+        this._bank = 0     // current cosmetic roll (rad)
+
+        // --- physics body --------------------------------------------------
+        const s = CFG.missile.spawn
+        const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+          .setTranslation(s.x, s.y, s.z)
+          .setLinearDamping(0)      // NO auto-braking — momentum is everything
+          .setAngularDamping(1)
+          .setCcdEnabled(true)       // fast projectile, thin girders
+          .setCanSleep(false)
+          .lockRotations()           // orientation is ours, not the solver's
+
+        this.body = physics.world.createRigidBody(bodyDesc)
+
+        const he = CFG.missile.halfExtents
+        this.collider = physics.world.createCollider(
+          RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z)
+            .setTranslation(0, 0, CFG.missile.colliderOffsetZ)
+            .setMass(CFG.missile.mass)
+            .setFriction(0.6)
+            .setRestitution(0.05)
+            .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+          this.body
+        )
+        physics.tag(this.collider, 'missile')
+
+        // Frozen (no gravity) until the player launches
+        this.body.setGravityScale(0, true)
+
+        // --- visuals ---------------------------------------------------------
+        this.mesh = this._buildMesh()
+        this.glowMat = this.mesh.userData.glowMat
+        scene.add(this.mesh)
+      }
+
+      /** Build the low-poly blocky missile mesh (root group + bank group). */
+      _buildMesh () {
+        const root = new THREE.Group()
+        const bank = new THREE.Group() // cosmetic roll only, physics stays yaw/pitch
+        root.add(bank)
+        root.userData.bank = bank
+
+        const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({
+          color, flatShading: true, roughness: 0.6, metalness: 0.25, ...opts
+        })
+
+        const fuselage = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 2.6), mat(0xd8dbe0))
+        bank.add(fuselage)
+
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.74, 0.32), mat(0xd2372a))
+        band.position.z = -0.55
+        bank.add(band)
+
+        const nose = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.2, 4), mat(0xd2372a))
+        nose.rotation.x = -Math.PI / 2 // apex points -Z (forward)
+        nose.position.z = -1.9
+        bank.add(nose)
+
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.5), mat(0x54595f))
+        tail.position.z = 1.25
+        bank.add(tail)
+
+        const finGeoX = new THREE.BoxGeometry(0.95, 0.14, 0.8)
+        const finGeoY = new THREE.BoxGeometry(0.14, 0.95, 0.8)
+        const finMat = mat(0x3b3f45)
+        for (const [geo, x, y] of [
+          [finGeoX, 0.62, 0], [finGeoX, -0.62, 0],
+          [finGeoY, 0, 0.62], [finGeoY, 0, -0.62]
+        ]) {
+          const fin = new THREE.Mesh(geo, finMat)
+          fin.position.set(x, y, 0.95)
+          bank.add(fin)
+        }
+
+        const glowMat = new THREE.MeshStandardMaterial({
+          color: 0xff8c3a, emissive: 0xff6a00, emissiveIntensity: 0.7, flatShading: true
+        })
+        const glow = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.28), glowMat)
+        glow.position.z = 1.6
+        bank.add(glow)
+        root.userData.glowMat = glowMat
+
+        root.traverse((o) => { if (o.isMesh) o.castShadow = true })
+        return root
+      }
+
+      // ---------------------------------------------------------------- getters
+
+      get position () {
+        const t = this.body.translation()
+        return new THREE.Vector3(t.x, t.y, t.z)
+      }
+
+      get quaternion () {
+        const r = this.body.rotation()
+        return new THREE.Quaternion(r.x, r.y, r.z, r.w)
+      }
+
+      get speed () {
+        const v = this.body.linvel()
+        return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+      }
+
+      forward (out = new THREE.Vector3()) {
+        return out.set(0, 0, -1).applyQuaternion(this.quaternion)
+      }
+
+      // ---------------------------------------------------------------- steering
+
+      applyLook (dx, dy) {
+        if (!dx && !dy) return
+        this.yaw -= dx * CFG.missile.lookSens
+        this.pitch = THREE.MathUtils.clamp(
+          this.pitch - dy * CFG.missile.lookSens,
+          -CFG.missile.maxPitch, CFG.missile.maxPitch
+        )
+        this._syncBodyRotation()
+      }
+
+      _syncBodyRotation () {
+        _mEuler.set(this.pitch, this.yaw, 0)
+        _mQuat.setFromEuler(_mEuler)
+        this.body.setRotation({ x: _mQuat.x, y: _mQuat.y, z: _mQuat.z, w: _mQuat.w }, true)
+      }
+
+      // ---------------------------------------------------------------- forces
+
+      preStep (stepDt, thrustHeld) {
+        if (!thrustHeld) return
+        this.forward(_mFwd)
+        const j = CFG.missile.thrustAccel * stepDt * CFG.missile.mass
+        this.body.applyImpulse({ x: _mFwd.x * j, y: _mFwd.y * j, z: _mFwd.z * j }, true)
+      }
+
+      applyAcceleration (accel, stepDt) {
+        const j = stepDt * CFG.missile.mass
+        this.body.applyImpulse({ x: accel.x * j, y: accel.y * j, z: accel.z * j }, true)
+      }
+
+      // ---------------------------------------------------------------- states
+
+      launch () {
+        this.body.setGravityScale(1, true)
+        this.forward(_mFwd)
+        const j = CFG.missile.launchSpeed * CFG.missile.mass
+        this.body.applyImpulse({ x: _mFwd.x * j, y: _mFwd.y * j, z: _mFwd.z * j }, true)
+      }
+
+      setChute (on) {
+        this.body.setLinearDamping(on ? CFG.chute.linearDamping : 0)
+      }
+
+      reset () {
+        const s = CFG.missile.spawn
+        this.yaw = 0
+        this.pitch = 0
+        this._prevYaw = 0
+        this._bank = 0
+        this.body.setTranslation({ x: s.x, y: s.y, z: s.z }, true)
+        this._syncBodyRotation()
+        this.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+        this.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+        this.body.setGravityScale(0, true)
+        this.body.setLinearDamping(0)
+        this.setVisible(true)
+        this.updateVisual(0.016, { state: 'ready', thrusting: false, boosting: false })
+      }
+
+      setVisible (v) { this.mesh.visible = v }
+
+      // ---------------------------------------------------------------- visuals
+
+      updateVisual (dt, ctx) {
+        if (!this.mesh.visible && ctx.state === 'crashed') return
+
+        const t = this.body.translation()
+        const r = this.body.rotation()
+        this.mesh.position.set(t.x, t.y, t.z)
+        this.mesh.quaternion.set(r.x, r.y, r.z, r.w)
+
+        const yawRate = dt > 0 ? (this.yaw - this._prevYaw) / dt : 0
+        this._prevYaw = this.yaw
+        this._bank = THREE.MathUtils.damp(
+          this._bank,
+          THREE.MathUtils.clamp(yawRate * 0.65, -1.15, 1.15),
+          7, dt
+        )
+        this.mesh.userData.bank.rotation.z = this._bank
+
+        if (ctx.state === 'ready') {
+          this.mesh.position.y += Math.sin(performance.now() * 0.002) * 0.18
+        }
+
+        const target = ctx.boosting ? 4.5 : ctx.thrusting ? 3.0 : 0.7
+        this.glowMat.emissiveIntensity = THREE.MathUtils.damp(
+          this.glowMat.emissiveIntensity, target, 8, dt
+        )
+      }
+    }
+
+    /* ================================================================
+     * abilities  (was src/abilities/*.js)
+     * ================================================================ */
+
+    // ---- GrappleHook ----------------------------------------------------
+    const _gDir = new THREE.Vector3()
+    const _gTail = new THREE.Vector3()
+    const _gMid = new THREE.Vector3()
+    const _gUp = new THREE.Vector3(0, 1, 0)
+
+    class GrappleHook {
+      constructor (physics, missile, scene) {
+        this.physics = physics
+        this.missile = missile
+
+        this.attached = false
+        this.anchor = new THREE.Vector3()
+        this.ropeLength = 0
+
+        this.canAttach = false
+        this.status = 'READY'
+        this._statusTimer = 0
+
+        this.ropeMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.06, 0.06, 1, 6, 1, true),
+          new THREE.MeshBasicMaterial({ color: 0xffe066 })
+        )
+        this.ropeMesh.visible = false
+        this.ropeMesh.frustumCulled = false
+
+        this.anchorMesh = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.45),
+          new THREE.MeshBasicMaterial({ color: 0xffd24a })
+        )
+        this.anchorMesh.visible = false
+        this.anchorMesh.frustumCulled = false
+
+        scene.add(this.ropeMesh, this.anchorMesh)
+      }
+
+      toggle () {
+        if (this.attached) this.release()
+        else this.fire()
+      }
+
+      fire () {
+        const p = this.missile.position
+        const f = this.missile.forward()
+        const hit = this.physics.raycast(
+          p.x, p.y, p.z, f.x, f.y, f.z, CFG.grapple.maxRange, this.missile.body
+        )
+
+        if (hit && this.physics.tagOf(hit.collider.handle) === 'level') {
+          this.anchor.set(hit.x, hit.y, hit.z)
+          this.ropeLength = Math.max(hit.dist, 2)
+          this.attached = true
+          this.status = 'ATTACHED'
+        } else {
+          this.status = 'OUT_OF_RANGE'
+          this._statusTimer = 0.8
+        }
+      }
+
+      release () {
+        this.attached = false
+        this.status = 'READY'
+        this.ropeMesh.visible = false
+        this.anchorMesh.visible = false
+      }
+
+      updateAim () {
+        if (this.attached) { this.canAttach = true; return }
+        const p = this.missile.position
+        const f = this.missile.forward()
+        const hit = this.physics.raycast(
+          p.x, p.y, p.z, f.x, f.y, f.z, CFG.grapple.maxRange, this.missile.body
+        )
+        this.canAttach = !!(hit && this.physics.tagOf(hit.collider.handle) === 'level')
+      }
+
+      update (dt) {
+        if (this._statusTimer > 0) {
+          this._statusTimer -= dt
+          if (this._statusTimer <= 0 && !this.attached) this.status = 'READY'
+        }
+      }
+
+      preStep (stepDt) {
+        if (!this.attached) return
+
+        const body = this.missile.body
+        const p = body.translation()
+
+        // Vector missile -> anchor
+        let ax = this.anchor.x - p.x
+        let ay = this.anchor.y - p.y
+        let az = this.anchor.z - p.z
+        const d = Math.hypot(ax, ay, az)
+        if (d <= this.ropeLength || d < 1e-6) return // slack rope — no force
+
+        const inv = 1 / d
+        ax *= inv; ay *= inv; az *= inv
+
+        // Remove the outward radial velocity component (rope can only pull).
+        const v = body.linvel()
+        let vx = v.x, vy = v.y, vz = v.z
+        const radial = vx * ax + vy * ay + vz * az
+        if (radial < 0) {
+          vx -= ax * radial
+          vy -= ay * radial
+          vz -= az * radial
+        }
+
+        // Soft stretch recovery toward the rope sphere
+        const kick = (d - this.ropeLength) * CFG.grapple.recover * stepDt
+        vx += ax * kick
+        vy += ay * kick
+        vz += az * kick
+
+        body.setLinvel({ x: vx, y: vy, z: vz }, true)
+
+        // Emergency positional clamp for extreme stretch
+        const maxLen = this.ropeLength * CFG.grapple.hardStretch
+        if (d > maxLen) {
+          body.setTranslation({
+            x: this.anchor.x - ax * maxLen,
+            y: this.anchor.y - ay * maxLen,
+            z: this.anchor.z - az * maxLen
+          }, true)
+        }
+      }
+
+      updateVisual () {
+        this.ropeMesh.visible = this.attached
+        this.anchorMesh.visible = this.attached
+        if (!this.attached) return
+
+        this.anchorMesh.rotation.y += 0.03
+        this.anchorMesh.rotation.x += 0.017
+
+        const m = this.missile
+        _gTail.set(0, 0, 1.6).applyQuaternion(m.quaternion).add(m.position)
+        _gDir.copy(this.anchor).sub(_gTail)
+        const len = Math.max(_gDir.length(), 0.001)
+        _gDir.multiplyScalar(1 / len)
+
+        _gMid.copy(_gTail).addScaledVector(_gDir, len * 0.5)
+        this.ropeMesh.position.copy(_gMid)
+        this.ropeMesh.scale.set(1, len, 1)
+        this.ropeMesh.quaternion.setFromUnitVectors(_gUp, _gDir)
+        this.anchorMesh.position.copy(this.anchor)
+      }
+
+      get hudLength () { return Math.round(this.ropeLength) }
+    }
+
+    // ---- Boost ------------------------------------------------------------
+    const BOOST_STATE = {
+      READY: 'ready',
+      ACTIVE: 'active',
+      COOLDOWN: 'cooldown'
+    }
+
+    class Boost {
+      constructor () {
+        this.state = BOOST_STATE.READY
+        this._t = 0
+      }
+
+      tryActivate () {
+        if (this.state !== BOOST_STATE.READY) return false
+        this.state = BOOST_STATE.ACTIVE
+        this._t = CFG.boost.duration
+        return true
+      }
+
+      update (dtGame, dtReal) {
+        if (this.state === BOOST_STATE.ACTIVE) {
+          this._t -= dtGame
+          if (this._t <= 0) {
+            this.state = BOOST_STATE.COOLDOWN
+            this._t = CFG.boost.cooldown
+          }
+        } else if (this.state === BOOST_STATE.COOLDOWN) {
+          this._t -= dtReal
+          if (this._t <= 0) {
+            this.state = BOOST_STATE.READY
+            this._t = 0
+          }
+        }
+      }
+
+      reset () {
+        this.state = BOOST_STATE.READY
+        this._t = 0
+      }
+
+      get active () { return this.state === BOOST_STATE.ACTIVE }
+
+      get accel () { return this.active ? CFG.boost.accel : 0 }
+
+      get hudRatio () {
+        if (this.state === BOOST_STATE.READY || this.state === BOOST_STATE.ACTIVE) return 1
+        return 1 - this._t / CFG.boost.cooldown
+      }
+    }
+
+    // ---- BulletTime ---------------------------------------------------------
+    class BulletTime {
+      constructor () {
+        this.active = false
+        this.current = 1
+      }
+
+      toggle () { this.active = !this.active }
+
+      set (v) { this.active = v }
+
+      reset () {
+        this.active = false
+        this.current = 1
+      }
+
+      update (dt) {
+        const target = this.active ? CFG.bulletTime.scale : 1
+        this.current = THREE.MathUtils.damp(this.current, target, CFG.bulletTime.lerpRate, dt)
+      }
+
+      get scale () { return this.current }
+    }
+
+    // ---- DragChute ------------------------------------------------------------
+    class DragChute {
+      constructor (missile, scene) {
+        this.missile = missile
+        this.deployed = false
+        this._visual = 0
+        this._wobbleT = 0
+
+        const chute = new THREE.Mesh(
+          new THREE.ConeGeometry(1.4, 1.6, 8, 1, true),
+          new THREE.MeshStandardMaterial({
+            color: 0xe8863c, flatShading: true, roughness: 0.85,
+            side: THREE.DoubleSide
+          })
+        )
+        chute.rotation.x = -Math.PI / 2
+        chute.position.set(0, 0, 3.1)
+        chute.scale.setScalar(0.001)
+        chute.visible = false
+        chute.castShadow = false
+        this.mesh = chute
+        missile.mesh.add(chute)
+      }
+
+      setDeployed (v) {
+        const next = !!v
+        if (next !== this.deployed) {
+          this.deployed = next
+          this.missile.setChute(next)
+        }
+      }
+
+      updateVisual (dt) {
+        this._visual = THREE.MathUtils.damp(this._visual, this.deployed ? 1 : 0, 10, dt)
+        const vis = this._visual > 0.02
+        this.mesh.visible = vis
+        if (!vis) return
+        this._wobbleT += dt
+        const w = 1 + Math.sin(this._wobbleT * 9) * 0.06
+        this.mesh.scale.set(this._visual * w, this._visual, this._visual * w)
+      }
+
+      reset () {
+        this.deployed = false
+        this._visual = 0
+        this.mesh.visible = false
+        this.missile.setChute(false)
+      }
+    }
+
+    /* ================================================================
+     * scene  (was src/scene/GameScene.js)
+     * ================================================================ */
+    class GameScene {
+      constructor (container) {
+        this.container = container
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true })
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+        this.renderer.setSize(window.innerWidth, window.innerHeight)
+        this.renderer.shadowMap.enabled = true
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+        this.renderer.toneMappingExposure = 1.05
+        container.appendChild(this.renderer.domElement)
+
+        this.scene = new THREE.Scene()
+        this.scene.background = new THREE.Color(0xc6d0da)
+        this.scene.fog = new THREE.Fog(0xc6d0da, 60, 560)
+
+        this.camera = new THREE.PerspectiveCamera(
+          74, window.innerWidth / window.innerHeight, 0.1, 1600
+        )
+        this.camera.position.set(0, 10, 70)
+
+        const hemi = new THREE.HemisphereLight(0xe9f2fb, 0x606468, 0.9)
+        this.scene.add(hemi)
+
+        const sun = new THREE.DirectionalLight(0xfff1de, 2.6)
+        sun.castShadow = true
+        sun.shadow.mapSize.set(2048, 2048)
+        sun.shadow.camera.left = -75
+        sun.shadow.camera.right = 75
+        sun.shadow.camera.top = 75
+        sun.shadow.camera.bottom = -75
+        sun.shadow.camera.near = 5
+        sun.shadow.camera.far = 320
+        sun.shadow.bias = -0.0004
+        sun.shadow.normalBias = 0.6
+        this.scene.add(sun)
+        this.scene.add(sun.target)
+        this.sun = sun
+
+        this._resizeCbs = []
+        window.addEventListener('resize', () => this._onResize())
+        this._onResize()
+      }
+
+      get canvas () { return this.renderer.domElement }
+
+      onResize (cb) {
+        this._resizeCbs.push(cb)
+        cb(this.renderer.domElement.height)
+      }
+
+      _onResize () {
+        const w = window.innerWidth
+        const h = window.innerHeight
+        this.renderer.setSize(w, h)
+        this.camera.aspect = w / h
+        this.camera.updateProjectionMatrix()
+        for (const cb of this._resizeCbs) cb(this.renderer.domElement.height)
+      }
+
+      update (followPos) {
+        this.sun.position.set(followPos.x + 55, followPos.y + 85, followPos.z + 35)
+        this.sun.target.position.copy(followPos)
+        this.sun.target.updateMatrixWorld()
+      }
+
+      render () {
+        this.renderer.render(this.scene, this.camera)
+      }
+    }
+
+    /* ================================================================
+     * particles  (was src/scene/particles.js)
+     * ================================================================ */
+    const VERT = /* glsl */ `
+      attribute float aSize;
+      attribute float aFade;
+      attribute vec3 aColor;
+      varying vec3 vColor;
+      varying float vFade;
+      uniform float uScale;
+
+      void main () {
+        vColor = aColor;
+        vFade = aFade;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = aSize * uScale / max(0.1, -mv.z);
+        gl_Position = projectionMatrix * mv;
+      }
+    `
+
+    const FRAG = /* glsl */ `
+      varying vec3 vColor;
+      varying float vFade;
+
+      void main () {
+        float d = length(gl_PointCoord - 0.5);
+        float a = smoothstep(0.5, 0.08, d) * vFade;
+        if (a < 0.02) discard;
+        gl_FragColor = vec4(vColor * a, a);
+      }
+    `
+
+    class ParticleSystem {
+      constructor (scene, count, { gravity = 0, drag = 0 } = {}) {
+        this.count = count
+        this.gravity = gravity
+        this.drag = drag
+        this.cursor = 0
+
+        this.pos = new Float32Array(count * 3)
+        this.vel = new Float32Array(count * 3)
+        this.col = new Float32Array(count * 3)
+        this.size = new Float32Array(count)
+        this.fade = new Float32Array(count)
+        this.age = new Float32Array(count).fill(1e9)
+        this.life = new Float32Array(count).fill(1)
+
+        const geo = new THREE.BufferGeometry()
+        geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage))
+        geo.setAttribute('aColor', new THREE.BufferAttribute(this.col, 3).setUsage(THREE.DynamicDrawUsage))
+        geo.setAttribute('aSize', new THREE.BufferAttribute(this.size, 1).setUsage(THREE.DynamicDrawUsage))
+        geo.setAttribute('aFade', new THREE.BufferAttribute(this.fade, 1).setUsage(THREE.DynamicDrawUsage))
+
+        this.material = new THREE.ShaderMaterial({
+          vertexShader: VERT,
+          fragmentShader: FRAG,
+          uniforms: { uScale: { value: 600 } },
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        })
+
+        this.points = new THREE.Points(geo, this.material)
+        this.points.frustumCulled = false
+        this.points.renderOrder = 5
+        scene.add(this.points)
+      }
+
+      setScale (pixelHeight) {
+        this.material.uniforms.uScale.value = Math.max(1, pixelHeight * 0.85)
+      }
+
+      spawn (px, py, pz, vx, vy, vz, life, size, r, g, b) {
+        const i = this.cursor
+        this.cursor = (this.cursor + 1) % this.count
+
+        const i3 = i * 3
+        this.pos[i3] = px; this.pos[i3 + 1] = py; this.pos[i3 + 2] = pz
+        this.vel[i3] = vx; this.vel[i3 + 1] = vy; this.vel[i3 + 2] = vz
+        this.col[i3] = r; this.col[i3 + 1] = g; this.col[i3 + 2] = b
+        this.size[i] = size
+        this.age[i] = 0
+        this.life[i] = life
+        this.fade[i] = 1
+      }
+
+      update (dt) {
+        if (dt <= 0) return
+        const dragF = Math.exp(-this.drag * dt)
+        const { pos, vel, age, life, fade } = this
+
+        for (let i = 0; i < this.count; i++) {
+          if (age[i] >= life[i]) {
+            if (fade[i] !== 0) fade[i] = 0
+            continue
+          }
+          age[i] += dt
+          const t = age[i] / life[i]
+
+          let f = t < 0.12 ? t / 0.12 : 1 - (t - 0.12) / 0.88
+          if (f < 0) f = 0
+          fade[i] = f * f
+
+          const i3 = i * 3
+          vel[i3] *= dragF
+          vel[i3 + 1] = vel[i3 + 1] * dragF + this.gravity * dt
+          vel[i3 + 2] *= dragF
+
+          pos[i3] += vel[i3] * dt
+          pos[i3 + 1] += vel[i3 + 1] * dt
+          pos[i3 + 2] += vel[i3 + 2] * dt
+        }
+
+        const g = this.points.geometry
+        g.attributes.position.needsUpdate = true
+        g.attributes.aColor.needsUpdate = true
+        g.attributes.aSize.needsUpdate = true
+        g.attributes.aFade.needsUpdate = true
+      }
+
+      clear () {
+        this.age.fill(1e9)
+        this.fade.fill(0)
+        this.points.geometry.attributes.aFade.needsUpdate = true
+      }
+    }
+
+    /* ================================================================
+     * effects  (was src/scene/Effects.js)
+     * ================================================================ */
+    const EXHAUST_COLORS = [
+      [1.0, 0.45, 0.12],
+      [1.0, 0.72, 0.30],
+      [1.0, 0.92, 0.70]
+    ]
+    const BOOST_COLORS = [
+      [1.0, 0.95, 0.80],
+      [1.0, 0.80, 0.40],
+      [0.90, 0.95, 1.00]
+    ]
+    const FIRE_COLORS = [
+      [1.0, 0.85, 0.55],
+      [1.0, 0.40, 0.10],
+      [0.90, 0.15, 0.05],
+      [0.55, 0.50, 0.45]
+    ]
+
+    const rand = (a, b) => a + Math.random() * (b - a)
+    const pick = (arr) => arr[(Math.random() * arr.length) | 0]
+
+    class Effects {
+      constructor (gameScene) {
+        const scene = gameScene.scene
+        this.scene = scene
+
+        this.exhaust = new ParticleSystem(scene, 900, { gravity: -1.5, drag: 0.8 })
+        this.puffs = new ParticleSystem(scene, 300, { gravity: -0.8, drag: 0.6 })
+        this.burst = new ParticleSystem(scene, 500, { gravity: -22, drag: 1.6 })
+
+        this.flash = new THREE.PointLight(0xffa050, 0, 160, 2)
+        scene.add(this.flash)
+        this._flashI = 0
+
+        this._exAcc = 0
+        this._puffAcc = 0
+
+        gameScene.onResize((h) => {
+          this.exhaust.setScale(h)
+          this.puffs.setScale(h)
+          this.burst.setScale(h)
+        })
+      }
+
+      emitExhaust (dt, tail, fwd, thrusting, boosting) {
+        const rate = boosting ? CFG.trail.rateBoost
+          : thrusting ? CFG.trail.rateThrust
+            : CFG.trail.rateIdle
+        this._exAcc += rate * dt
+        let n = this._exAcc | 0
+        this._exAcc -= n
+
+        const palette = boosting ? BOOST_COLORS : EXHAUST_COLORS
+        const back = boosting ? 16 : 8
+        const spread = boosting ? 0.34 : 0.18
+
+        for (; n > 0; n--) {
+          const c = pick(palette)
+          this.exhaust.spawn(
+            tail.x + rand(-spread, spread),
+            tail.y + rand(-spread, spread),
+            tail.z + rand(-spread, spread),
+            -fwd.x * back * rand(0.4, 1) + rand(-2, 2),
+            -fwd.y * back * rand(0.4, 1) + rand(-2, 2),
+            -fwd.z * back * rand(0.4, 1) + rand(-2, 2),
+            boosting ? rand(0.22, 0.55) : rand(0.35, 0.8),
+            (boosting ? 1.25 : 1) * rand(0.5, 1.05),
+            c[0], c[1], c[2]
+          )
+        }
+      }
+
+      emitChutePuff (dt, pos) {
+        this._puffAcc += 30 * dt
+        let n = this._puffAcc | 0
+        this._puffAcc -= n
+        for (; n > 0; n--) {
+          this.puffs.spawn(
+            pos.x + rand(-0.4, 0.4),
+            pos.y + rand(-0.4, 0.4),
+            pos.z + rand(-0.4, 0.4),
+            rand(-1.5, 1.5), rand(-1.5, 1.5), rand(-1.5, 1.5),
+            rand(0.9, 1.5),
+            rand(0.55, 0.95),
+            0.62, 0.63, 0.68
+          )
+        }
+      }
+
+      explosionAt (p) {
+        this._spawnBurst(p, CFG.explosion.count, 6, 55, FIRE_COLORS, 0.7, 2.6)
+        this.flash.position.copy(p)
+        this.flash.color.set(0xffa050)
+        this._flashI = CFG.explosion.flashIntensity
+      }
+
+      fireworksAt (p) {
+        const palette = [[1.0, 0.25, 0.15], [1.0, 0.95, 0.85], [1.0, 0.70, 0.30]]
+        this._spawnBurst(p, 280, 5, 42, palette, 0.7, 2.2)
+        this.flash.position.copy(p)
+        this.flash.color.set(0xff4030)
+        this._flashI = 260
+      }
+
+      _spawnBurst (p, count, minSpeed, maxSpeed, palette, minLife, maxLife) {
+        for (let i = 0; i < count; i++) {
+          const u = Math.random() * 2 - 1
+          const phi = Math.random() * Math.PI * 2
+          const s = Math.sqrt(1 - u * u)
+          const speed = maxSpeed * Math.sqrt(Math.random()) + minSpeed * 0.3
+          const c = pick(palette)
+          this.burst.spawn(
+            p.x, p.y, p.z,
+            s * Math.cos(phi) * speed,
+            u * speed,
+            s * Math.sin(phi) * speed,
+            rand(minLife, maxLife),
+            rand(0.7, 2.4),
+            c[0], c[1], c[2]
+          )
+        }
+      }
+
+      update (dt) {
+        this.exhaust.update(dt)
+        this.puffs.update(dt)
+        this.burst.update(dt)
+
+        if (this._flashI > 0) {
+          this._flashI *= Math.exp(-6 * dt)
+          if (this._flashI < 0.5) this._flashI = 0
+          this.flash.intensity = this._flashI
+        }
+      }
+
+      reset () {
+        this.exhaust.clear()
+        this.puffs.clear()
+        this.burst.clear()
+        this._flashI = 0
+        this.flash.intensity = 0
+        this._exAcc = 0
+        this._puffAcc = 0
+      }
+    }
+
+    /* ================================================================
+     * level  (was src/scene/Level.js)
+     * ================================================================ */
+    const _lvEuler = new THREE.Euler()
+    const _lvQuat = new THREE.Quaternion()
+
+    class Level {
+      constructor (physics, scene) {
+        this.physics = physics
+        this.scene = scene
+
+        this.staticBody = physics.createFixedBody()
+
+        this.targetPosition = new THREE.Vector3(0, 24.8, -260)
+        this._targetMat = null
+        this._t = 0
+
+        this._concreteMat = new THREE.MeshStandardMaterial({
+          color: 0x9aa0a6, flatShading: true, roughness: 0.92, metalness: 0.02
+        })
+        this._darkConcreteMat = new THREE.MeshStandardMaterial({
+          color: 0x7f858c, flatShading: true, roughness: 0.95
+        })
+        this._girderMat = new THREE.MeshStandardMaterial({
+          color: 0x666c75, flatShading: true, roughness: 0.5, metalness: 0.55
+        })
+        this._accentMat = new THREE.MeshStandardMaterial({
+          color: 0xc9522f, flatShading: true, roughness: 0.8
+        })
+        this._hazardMat = new THREE.MeshStandardMaterial({
+          color: 0xd9a021, flatShading: true, roughness: 0.7
+        })
+
+        this._build()
+      }
+
+      _addBox (x, y, z, sx, sy, sz, {
+        material = this._concreteMat, tag = 'level', rot = null, castShadow = true
+      } = {}) {
+        let quat = null
+        if (rot) {
+          _lvEuler.set(rot.x || 0, rot.y || 0, rot.z || 0)
+          _lvQuat.setFromEuler(_lvEuler)
+          quat = { x: _lvQuat.x, y: _lvQuat.y, z: _lvQuat.z, w: _lvQuat.w }
+        }
+
+        let desc = RAPIER.ColliderDesc.cuboid(sx / 2, sy / 2, sz / 2)
+          .setTranslation(x, y, z)
+          .setFriction(0.8)
+        if (quat) desc = desc.setRotation(quat)
+        const collider = this.physics.world.createCollider(desc, this.staticBody)
+        this.physics.tag(collider, tag)
+
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), material)
+        mesh.position.set(x, y, z)
+        if (quat) mesh.quaternion.set(quat.x, quat.y, quat.z, quat.w)
+        mesh.castShadow = castShadow
+        mesh.receiveShadow = true
+        this.scene.add(mesh)
+        return mesh
+      }
+
+      _build () {
+        // ---- ground slab (crashing into it ends the run) -------------------
+        this._addBox(0, -2, -90, 240, 4, 430)
+
+        // ---- perimeter walls: keep the missile inside the course -----------
+        this._addBox(-73, 7, -90, 4, 18, 430, { material: this._girderMat })
+        this._addBox(73, 7, -90, 4, 18, 430, { material: this._girderMat })
+        this._addBox(0, 7, 120, 150, 18, 4, { material: this._girderMat })
+
+        // ---- zone 1: launch pad --------------------------------------------
+        this._addBox(0, 0.2, 55, 10, 0.4, 10, { material: this._accentMat })
+
+        // ---- zone 2: girder gate (z = 20) ------------------------------------
+        this._addBox(-8, 5, 20, 4, 10, 4, { material: this._girderMat })
+        this._addBox(8, 5, 20, 4, 10, 4, { material: this._girderMat })
+        this._addBox(-17, 5, 20, 18, 10, 3, { material: this._girderMat })
+        this._addBox(17, 5, 20, 18, 10, 3, { material: this._girderMat })
+        this._addBox(-2.5, 5, 18.4, 1, 10, 0.4, { material: this._hazardMat })
+        this._addBox(2.5, 5, 18.4, 1, 10, 0.4, { material: this._hazardMat })
+
+        // ---- zone 3: pillar slalom (z = -5 .. -30) ---------------------------
+        for (const [x, z] of [[-5, -5], [5, -10], [-5, -15], [5, -20], [-5, -25]]) {
+          this._addBox(x, 5, z, 3, 10, 3)
+        }
+        this._addBox(-5, 10.5, -15, 1.2, 1.2, 24, { material: this._girderMat })
+        this._addBox(5, 10.5, -15, 1.2, 1.2, 24, { material: this._girderMat })
+
+        // ---- zone 4: the wall with a window (z = -75) ------------------------
+        this._addBox(0, 3.5, -75, 60, 7, 3, { material: this._darkConcreteMat })
+        this._addBox(0, 20, -75, 60, 14, 3, { material: this._darkConcreteMat })
+        this._addBox(-16.5, 10, -75, 27, 6, 3, { material: this._darkConcreteMat })
+        this._addBox(16.5, 10, -75, 27, 6, 3, { material: this._darkConcreteMat })
+        this._addBox(0, 7, -73.4, 7.4, 0.5, 0.4, { material: this._hazardMat })
+        this._addBox(0, 13, -73.4, 7.4, 0.5, 0.4, { material: this._hazardMat })
+        this._addBox(-3.2, 10, -73.4, 0.5, 6.4, 0.4, { material: this._hazardMat })
+        this._addBox(3.2, 10, -73.4, 0.5, 6.4, 0.4, { material: this._hazardMat })
+
+        // ---- zone 5: half pyramid (z = -140) ----------------------------------
+        const steps = [
+          [40, 4, 40],
+          [32, 4, 32],
+          [24, 4, 24],
+          [16, 4, 16],
+          [8, 4, 8]
+        ]
+        let y = 2
+        for (const [sx, sz] of steps) {
+          this._addBox(0, y, -140, sx, 4, sz, { material: this._darkConcreteMat })
+          y += 4
+        }
+        this._addBox(-26, 8, -140, 6, 1, 10, { material: this._girderMat })
+        this._addBox(26, 12, -140, 6, 1, 10, { material: this._girderMat })
+
+        // ---- zone 6: slope wall + arch (z = -175) -----------------------------
+        this._addBox(0, 8.5, -175, 40, 1.6, 26, {
+          material: this._darkConcreteMat, rot: { x: -0.58 }
+        })
+        this._addBox(-6, 12, -188, 3, 24, 3, { material: this._girderMat })
+        this._addBox(6, 12, -188, 3, 24, 3, { material: this._girderMat })
+        this._addBox(0, 24.5, -188, 15, 3, 3, { material: this._accentMat })
+
+        // ---- zone 7: kicker ramp (z = -215) -------------------------------------
+        this._addBox(0, 5, -215, 14, 1.6, 14, {
+          material: this._darkConcreteMat, rot: { x: -0.42 }
+        })
+
+        // ---- zone 8: finish — target sphere on a tower (z = -260) ---------------
+        this._addBox(0, 10, -260, 10, 24, 10, { material: this._darkConcreteMat })
+        this._addBox(0, 22.2, -260, 6, 0.4, 6, { material: this._accentMat })
+
+        this._targetMat = new THREE.MeshStandardMaterial({
+          color: 0xff2a1a, emissive: 0xff2200, emissiveIntensity: 2.0,
+          flatShading: true, roughness: 0.4
+        })
+        const target = new THREE.Mesh(
+          new THREE.SphereGeometry(2.4, 12, 8), this._targetMat
+        )
+        target.position.copy(this.targetPosition)
+        target.castShadow = true
+        this.scene.add(target)
+        this.target = target
+
+        const targetCollider = this.physics.world.createCollider(
+          RAPIER.ColliderDesc.ball(2.4)
+            .setTranslation(this.targetPosition.x, this.targetPosition.y, this.targetPosition.z)
+            .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+          this.staticBody
+        )
+        this.physics.tag(targetCollider, 'target')
+
+        const beam = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.1, 1.1, 90, 8, 1, true),
+          new THREE.MeshBasicMaterial({
+            color: 0xff3322, transparent: true, opacity: 0.16,
+            blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+          })
+        )
+        beam.position.set(this.targetPosition.x, 45, this.targetPosition.z)
+        beam.frustumCulled = false
+        this.scene.add(beam)
+      }
+
+      update (dt) {
+        this._t += dt
+        this._targetMat.emissiveIntensity = 1.8 + Math.sin(this._t * 4) * 0.7
+        this.target.rotation.y += dt * 0.8
+      }
+    }
+
+    /* ================================================================
+     * camera  (was src/scene/CameraRig.js)
+     * ================================================================ */
+    const _crDesiredPos = new THREE.Vector3()
+    const _crDesiredLook = new THREE.Vector3()
+    const _crOff = new THREE.Vector3()
+    const _crFwd = new THREE.Vector3()
+
+    class CameraRig {
+      constructor (camera, missile) {
+        this.cam = camera
+        this.pos = new THREE.Vector3()
+        this.look = new THREE.Vector3()
+        this.trauma = 0
+        this._shakeT = 0
+        this._orbit = 0
+        this.fov = CFG.camera.fovBase
+
+        _crOff.set(CFG.camera.offset.x, CFG.camera.offset.y, CFG.camera.offset.z)
+          .applyQuaternion(missile.quaternion)
+        this.pos.copy(missile.position).add(_crOff)
+        this.look.copy(missile.position)
+      }
+
+      addTrauma (v) { this.trauma = Math.min(1, this.trauma + v) }
+
+      update (dt, ctx) {
+        let posLerp, lookLerp
+
+        if (ctx.state === 'crashed' || ctx.state === 'complete') {
+          this._orbit += dt * 0.3
+          _crDesiredPos.set(Math.cos(this._orbit) * 26, 10, Math.sin(this._orbit) * 26)
+            .add(ctx.focus)
+          _crDesiredLook.copy(ctx.focus)
+          posLerp = 1 - Math.exp(-2.5 * dt)
+          lookLerp = 1 - Math.exp(-4 * dt)
+        } else {
+          const m = ctx.missile
+          _crOff.set(CFG.camera.offset.x, CFG.camera.offset.y, CFG.camera.offset.z)
+            .applyQuaternion(m.quaternion)
+          _crDesiredPos.copy(m.position).add(_crOff)
+          _crDesiredLook.copy(m.position).addScaledVector(m.forward(_crFwd), CFG.camera.lookAhead)
+          posLerp = 1 - Math.exp(-CFG.camera.posLerp * dt)
+          lookLerp = 1 - Math.exp(-CFG.camera.lookLerp * dt)
+        }
+
+        this.pos.lerp(_crDesiredPos, posLerp)
+        this.look.lerp(_crDesiredLook, lookLerp)
+        if (this.pos.y < 1.2) this.pos.y = 1.2
+
+        this.trauma = Math.max(0, this.trauma - CFG.camera.shakeDecay * dt)
+        this._shakeT += dt * 34
+        const s = this.trauma * this.trauma
+        const ox = (Math.sin(this._shakeT * 1.7) + 0.6 * Math.sin(this._shakeT * 3.9)) * 1.1 * s
+        const oy = (Math.sin(this._shakeT * 2.3 + 2) + 0.6 * Math.sin(this._shakeT * 4.7)) * 1.1 * s
+
+        this.cam.position.set(this.pos.x + ox, this.pos.y + oy, this.pos.z)
+        this.cam.lookAt(this.look)
+
+        let targetFov = CFG.camera.fovBase
+        if (ctx.boostActive) targetFov = CFG.camera.fovBoost
+        else if (ctx.thrusting) targetFov = CFG.camera.fovThrust
+        if (ctx.slowmo) targetFov += CFG.camera.fovSlowmoDelta
+        this.fov = THREE.MathUtils.damp(this.fov, targetFov, 5, dt)
+        this.cam.fov = this.fov
+        this.cam.updateProjectionMatrix()
+      }
+    }
+
+    /* ================================================================
+     * hud  (was src/ui/HUD.js + hud.css)
+     * ================================================================ */
+    const fmtTime = (t) => {
+      if (t < 60) return t.toFixed(2)
+      const m = Math.floor(t / 60)
+      return `${m}:${(t - m * 60).toFixed(2).padStart(5, '0')}`
+    }
+
+    const CONTROLS_HTML = `
+      <div class="k">MOUSE</div><div>steer missile</div>
+      <div class="k">SPACE</div><div>main thrust</div>
+      <div class="k">LMB</div><div>grapple / release</div>
+      <div class="k">SHIFT</div><div>super boost</div>
+      <div class="k">RMB</div><div>bullet-time</div>
+      <div class="k">S</div><div>drag chute</div>
+      <div class="k">R</div><div>restart level</div>
+    `
+
+    class HUD {
+      constructor () {
+        const root = document.createElement('div')
+        root.id = 'hud'
+        root.innerHTML = `
+          <div class="hud-topleft">
+            <div id="hud-timer">0.00</div>
+            <div id="hud-speed">0 m/s</div>
+          </div>
+          <div class="hud-topright">
+            <div class="chip" id="chip-thrust"><span>THRUST</span><span class="key">SPACE</span></div>
+            <div class="chip" id="chip-boost"><span>BOOST</span><span class="bar"><span id="boost-fill"></span></span><span class="key">SHIFT</span></div>
+            <div class="chip" id="chip-slowmo"><span>SLOW-MO</span><span class="key">RMB</span></div>
+            <div class="chip" id="chip-chute"><span>CHUTE</span><span class="key">S</span></div>
+            <div class="chip" id="chip-hook"><span>HOOK</span><span id="hook-state">READY</span><span class="key">LMB</span></div>
+          </div>
+          <div id="crosshair"><div class="ring"></div><div class="dot"></div></div>
+          <div id="hint">MOUSE steer&ensp;&middot;&ensp;SPACE thrust&ensp;&middot;&ensp;LMB grapple&ensp;&middot;&ensp;SHIFT boost&ensp;&middot;&ensp;RMB slow-mo&ensp;&middot;&ensp;S chute&ensp;&middot;&ensp;R restart</div>
+          <div id="vignette"></div>
+          <div id="overlay">
+            <div id="overlay-title"></div>
+            <div id="overlay-time"></div>
+            <div id="overlay-sub"></div>
+            <div id="overlay-controls">${CONTROLS_HTML}</div>
+          </div>
+        `
+        document.body.appendChild(root)
+
+        this.el = {
+          timer: document.getElementById('hud-timer'),
+          speed: document.getElementById('hud-speed'),
+          thrust: document.getElementById('chip-thrust'),
+          boost: document.getElementById('chip-boost'),
+          boostFill: document.getElementById('boost-fill'),
+          slowmo: document.getElementById('chip-slowmo'),
+          chute: document.getElementById('chip-chute'),
+          hook: document.getElementById('chip-hook'),
+          hookState: document.getElementById('hook-state'),
+          crosshair: document.getElementById('crosshair'),
+          hint: document.getElementById('hint'),
+          vignette: document.getElementById('vignette'),
+          overlay: document.getElementById('overlay'),
+          overlayTitle: document.getElementById('overlay-title'),
+          overlaySub: document.getElementById('overlay-sub'),
+          overlayTime: document.getElementById('overlay-time'),
+          overlayControls: document.getElementById('overlay-controls')
+        }
+
+        this._state = 'ready'
+        this._locked = false
+        this._hintT = 0
+        this._refreshOverlay()
+      }
+
+      setPointerLocked (v) {
+        this._locked = v
+        if (this._state === 'ready') this._refreshOverlay()
+      }
+
+      reset () {
+        this._state = 'ready'
+        this._hintT = 0
+        this.el.hint.classList.remove('faded', 'attention')
+        this._refreshOverlay()
+      }
+
+      launch () {
+        this._state = 'flying'
+        this._refreshOverlay()
+      }
+
+      crash () {
+        this._state = 'crashed'
+        this._refreshOverlay()
+      }
+
+      complete (time) {
+        this._state = 'complete'
+        this._time = time
+        this._refreshOverlay()
+      }
+
+      _refreshOverlay () {
+        const e = this.el
+        const show = (v) => { e.overlay.classList.toggle('show', v) }
+
+        if (this._state === 'flying') {
+          show(false)
+        } else if (this._state === 'ready') {
+          show(true)
+          e.overlay.classList.remove('crash', 'win')
+          if (this._locked) {
+            e.overlayTitle.textContent = 'READY'
+            e.overlaySub.textContent = 'SPACE TO LAUNCH'
+            e.overlayControls.classList.remove('show')
+          } else {
+            e.overlayTitle.textContent = 'DUMBFIRE'
+            e.overlaySub.textContent = 'CLICK TO TAKE CONTROL'
+            e.overlayControls.classList.add('show')
+          }
+        } else if (this._state === 'crashed') {
+          show(true)
+          e.overlay.classList.add('crash')
+          e.overlay.classList.remove('win')
+          e.overlayTitle.textContent = 'WRECKED'
+          e.overlaySub.textContent = 'RESTARTING\u2026'
+        } else if (this._state === 'complete') {
+          show(true)
+          e.overlay.classList.add('win')
+          e.overlay.classList.remove('crash')
+          e.overlayTitle.textContent = 'TARGET DESTROYED'
+          e.overlayTime.textContent = `${fmtTime(this._time)} s`
+          e.overlaySub.textContent = 'PRESS R TO FLY AGAIN'
+        }
+
+        e.hint.classList.toggle('attention', this._state === 'flying' && !this._locked)
+      }
+
+      update (dt, s) {
+        const e = this.el
+
+        e.timer.textContent = fmtTime(s.time)
+        e.speed.textContent = `${Math.round(s.speed)} m/s`
+
+        e.thrust.classList.toggle('on', s.thrust)
+        e.boost.classList.toggle('on', s.boostActive)
+        e.boostFill.style.width = `${Math.round(s.boostRatio * 100)}%`
+        e.slowmo.classList.toggle('on', s.slowmo)
+        e.chute.classList.toggle('on', s.chute)
+
+        e.hook.classList.toggle('on', s.hooked)
+        const outOfRange = s.hookStatus === 'OUT_OF_RANGE' && !s.hooked
+        e.hook.classList.toggle('warn', outOfRange)
+        e.hookState.textContent = s.hooked
+          ? `${s.hookLen} m`
+          : (outOfRange ? 'OUT OF RANGE' : 'READY')
+
+        e.crosshair.classList.toggle('hit', s.canHook && !s.hooked)
+        e.crosshair.classList.toggle('attached', s.hooked)
+
+        this._hintT += dt
+        if (this._hintT > CFG.ui.hintFadeAfter) e.hint.classList.add('faded')
+      }
+
+      setVignette (on) {
+        this.el.vignette.classList.toggle('on', on)
+      }
+    }
+
+    /* ================================================================
+     * game  (was src/game/Game.js)
+     * ================================================================ */
+    const _gmTail = new THREE.Vector3()
+    const _gmFwd = new THREE.Vector3()
+
+    class Game {
+      constructor (deps) {
+        Object.assign(this, deps)
+
+        this.state = 'ready'
+        this.runTime = 0
+        this.stateTimer = 0
+        this.acc = 0
+        this.crashPoint = new THREE.Vector3()
+        this.lastTime = performance.now()
+
+        this.physics.onCollision = (h1, h2, started) => this._onCollision(h1, h2, started)
+
+        this.reset()
+
+        this._raf = (t) => this.frame(t)
+        requestAnimationFrame(this._raf)
+      }
+
+      reset () {
+        this.state = 'ready'
+        this.runTime = 0
+        this.stateTimer = 0
+        this.acc = 0
+
+        this.missile.reset()
+        this.grapple.release()
+        this.boost.reset()
+        this.bulletTime.reset()
+        this.chute.reset()
+        this.effects.reset()
+        this.hud.reset()
+      }
+
+      startRun () {
+        this.state = 'flying'
+        this.runTime = 0
+        this.missile.launch()
+        this.hud.launch()
+      }
+
+      crash () {
+        if (this.state !== 'flying') return
+        this.state = 'crashed'
+        this.stateTimer = 0
+
+        this.crashPoint.copy(this.missile.position)
+        this.effects.explosionAt(this.crashPoint)
+        this.cameraRig.addTrauma(1.0)
+
+        this.missile.setVisible(false)
+        this.grapple.release()
+        this.chute.reset()
+        this.bulletTime.reset()
+        this.hud.crash()
+      }
+
+      complete () {
+        if (this.state !== 'flying') return
+        this.state = 'complete'
+        this.stateTimer = 0
+
+        this.effects.fireworksAt(this.level.targetPosition)
+        this.cameraRig.addTrauma(0.35)
+
+        this.missile.setVisible(false)
+        this.grapple.release()
+        this.chute.reset()
+        this.bulletTime.reset()
+        this.hud.complete(this.runTime)
+      }
+
+      _onCollision (h1, h2, started) {
+        if (!started || this.state !== 'flying') return
+        const a = this.physics.tagOf(h1)
+        const b = this.physics.tagOf(h2)
+        const has = (t) => a === t || b === t
+        if (has('missile') && has('level')) this.crash()
+        else if (has('missile') && has('target')) this.complete()
+      }
+
+      frame (now) {
+        const dt = Math.min((now - this.lastTime) / 1000, 0.05)
+        this.lastTime = now
+        const input = this.input
+
+        if (input.wasPressed('KeyR')) this.reset()
+
+        switch (this.state) {
+          case 'ready': this._updateReady(dt); break
+          case 'flying': this._updateFlying(dt); break
+          case 'crashed':
+            this.stateTimer += dt
+            if (this.stateTimer > CFG.ui.restartDelay) this.reset()
+            break
+          case 'complete': this.stateTimer += dt; break
+        }
+
+        const thrusting = this.state === 'flying' && input.isDown('Space')
+        this.missile.updateVisual(dt, {
+          state: this.state, thrusting, boosting: this.boost.active
+        })
+        this.chute.updateVisual(dt)
+        this.grapple.updateVisual()
+        this.hud.setVignette(this.bulletTime.active && this.state === 'flying')
+
+        const fxScale = this.state === 'flying' ? this.bulletTime.current : 1
+        this.effects.update(dt * fxScale)
+        this.level.update(dt)
+
+        const focus = this.state === 'crashed'
+          ? this.crashPoint
+          : (this.state === 'complete' ? this.level.targetPosition : null)
+        this.cameraRig.update(dt, {
+          missile: this.missile, state: this.state, focus,
+          thrusting, boostActive: this.boost.active, slowmo: this.bulletTime.active
+        })
+
+        this.scene.update(this.state === 'flying' || this.state === 'ready'
+          ? this.missile.position
+          : (focus || this.missile.position))
+        this.scene.render()
+
+        this.hud.update(dt, {
+          state: this.state,
+          time: this.runTime,
+          speed: this.missile.speed,
+          thrust: thrusting,
+          boostRatio: this.boost.hudRatio,
+          boostActive: this.boost.active,
+          slowmo: this.bulletTime.active && this.state === 'flying',
+          chute: this.chute.deployed,
+          hooked: this.grapple.attached,
+          hookLen: this.grapple.hudLength,
+          hookStatus: this.grapple.status,
+          canHook: this.grapple.canAttach,
+          locked: input.locked
+        })
+
+        input.endFrame()
+        requestAnimationFrame(this._raf)
+      }
+
+      _updateReady (dt) {
+        const input = this.input
+        if (input.locked) {
+          const d = input.consumeMouseDelta()
+          this.missile.applyLook(d.dx, d.dy)
+        }
+        this.missile.forward(_gmFwd)
+        _gmTail.set(0, 0, 1.6).applyQuaternion(this.missile.quaternion).add(this.missile.position)
+        this.effects.emitExhaust(dt, _gmTail, _gmFwd, false, false)
+
+        if (input.wasPressed('Space')) this.startRun()
+      }
+
+      _updateFlying (dt) {
+        const { input, missile, grapple, boost, bulletTime, chute } = this
+
+        // 1) Steering (mouse look, direct orientation write)
+        if (input.locked) {
+          const d = input.consumeMouseDelta()
+          missile.applyLook(d.dx, d.dy)
+        }
+
+        // 2) Ability edges — button edges only count while pointer-locked
+        if (input.locked && input.wasButtonPressed(0)) grapple.toggle()
+        if (input.locked && input.wasButtonPressed(2)) bulletTime.toggle()
+        if (input.wasPressed('ShiftLeft') || input.wasPressed('ShiftRight')) boost.tryActivate()
+        chute.setDeployed(input.isDown('KeyS'))
+        grapple.updateAim()
+        grapple.update(dt)
+
+        // 3) Ability timers — boost duration in game time, cooldown in real time
+        const dtGame = dt * bulletTime.current
+        boost.update(dtGame, dt)
+        bulletTime.update(dt)
+
+        // 4) Physics: fixed real-time steps, dt scaled by bullet time
+        this.acc += dt
+        const FIXED = CFG.physics.fixedDt
+        let steps = 0
+        while (this.acc >= FIXED && steps < CFG.physics.maxStepsPerFrame) {
+          const stepDt = FIXED * bulletTime.current
+          this.physics.setStepDt(stepDt)
+
+          missile.preStep(stepDt, input.isDown('Space'))
+
+          if (boost.active) {
+            missile.forward(_gmFwd).multiplyScalar(CFG.boost.accel)
+            missile.applyAcceleration(_gmFwd, stepDt)
+          }
+
+          grapple.preStep(stepDt)
+
+          this.physics.step()
+          this.acc -= FIXED
+          steps++
+        }
+        if (steps === CFG.physics.maxStepsPerFrame) this.acc = 0
+
+        // 5) Collision consequences
+        this.physics.drainCollisions()
+
+        // 6) Course bounds — flew off the map
+        const p = missile.position
+        const B = CFG.bounds
+        if (p.x < B.minX || p.x > B.maxX || p.z < B.minZ || p.z > B.maxZ ||
+            p.y > B.maxY || p.y < -6) {
+          this.crash()
+          return
+        }
+
+        // 7) Run clock — REAL seconds
+        this.runTime += dt
+
+        // 8) Exhaust trail
+        missile.forward(_gmFwd)
+        _gmTail.set(0, 0, 1.6).applyQuaternion(missile.quaternion).add(p)
+        this.effects.emitExhaust(dt, _gmTail, _gmFwd, input.isDown('Space'), boost.active)
+        if (chute.deployed) this.effects.emitChutePuff(dt, _gmTail)
+      }
+    }
+
+    /* ================================================================
+     * main  (was src/main.js)
+     * ================================================================ */
+    async function main () {
+      const physics = await PhysicsWorld.create()
+
+      const scene = new GameScene(document.getElementById('app'))
+
+      const level = new Level(physics, scene.scene)
+
+      const input = new InputManager(scene.canvas)
+      input.attach()
+
+      const missile = new Missile(physics, scene.scene)
+      const grapple = new GrappleHook(physics, missile, scene.scene)
+      const boost = new Boost()
+      const bulletTime = new BulletTime()
+      const chute = new DragChute(missile, scene.scene)
+
+      const effects = new Effects(scene)
+      const cameraRig = new CameraRig(scene.camera, missile)
+      const hud = new HUD()
+
+      input.onLockChange = (locked) => hud.setPointerLocked(locked)
+
+      const game = new Game({
+        physics, scene, level, input, hud, effects, cameraRig,
+        missile, grapple, boost, bulletTime, chute
+      })
+
+      window.__game = game
+    }
+
+    main().catch((err) => {
+      console.error('[DUMBFIRE] fatal:', err)
+      const app = document.getElementById('app')
+      if (app) {
+        app.innerHTML =
+          `<div style="color:#ff6b57;font-family:monospace;padding:24px;">` +
+          `Failed to start DUMBFIRE: ${err.message}</div>`
+      }
+    })
+  </script>
+</body>
+</html>

@@ -109,6 +109,31 @@ export class HUD {
     this._time = 0
     this._renderMenu()
     this._refreshOverlay()
+
+    // Portrait rotate hint (touch devices only) — phones fly much better in
+    // landscape; a slim non-blocking banner suggests it while in portrait.
+    if (this.mobile) {
+      const rh = document.createElement('div')
+      rh.id = 'rotate-hint'
+      rh.innerHTML = '<div class="rh-phone"></div><div class="rh-text">横屏体验更佳</div>'
+      root.appendChild(rh)
+      this.el.rotateHint = rh
+      this._oriMq = window.matchMedia('(orientation: portrait)')
+      const onOri = () => this._updateRotateHint()
+      if (this._oriMq.addEventListener) this._oriMq.addEventListener('change', onOri)
+      else if (this._oriMq.addListener) this._oriMq.addListener(onOri) // old Safari
+      onOri()
+    }
+  }
+
+  /** Show the rotate banner only in portrait + active gameplay states. */
+  _updateRotateHint () {
+    if (!this.el.rotateHint) return
+    const portrait = this._oriMq ? this._oriMq.matches
+      : (window.innerHeight > window.innerWidth)
+    const active = this._state === 'ready' || this._state === 'flying' ||
+      this._state === 'crashed'
+    this.el.rotateHint.classList.toggle('show', portrait && active)
   }
 
   // ------------------------------------------------ level select menu
@@ -129,7 +154,7 @@ export class HUD {
     }).join('')
     this.el.menuCards.innerHTML = cards
     this.el.menuFoot.textContent = this.mobile
-      ? '点击卡片开始 · 左侧摇杆转向'
+      ? '点击卡片开始 · 左半屏摇杆转向 · 轻点 THRUST 锁定引擎'
       : '点击卡片或按 1 / 2 / 3 选择关卡'
 
     this.el.menuCards.querySelectorAll('.card').forEach((card) => {
@@ -202,7 +227,10 @@ export class HUD {
     e.panel.style.display = inMenu ? 'none' : 'flex'
     e.overlay.classList.toggle('show', inMenu || this._state !== 'flying' || !!this._paused)
 
-    if (inMenu) return
+    if (inMenu) {
+      this._updateRotateHint()
+      return
+    }
 
     e.overlay.classList.remove('crash', 'win')
     e.winButtons.innerHTML = ''
@@ -211,7 +239,7 @@ export class HUD {
     if (this._state === 'ready') {
       if (this.mobile) {
         e.overlayTitle.textContent = 'READY'
-        e.overlaySub.textContent = '按住右侧 THRUST 起飞'
+        e.overlaySub.textContent = '轻点 THRUST 起飞 · 再点一次熄火'
       } else if (this._locked) {
         e.overlayTitle.textContent = 'READY'
         e.overlaySub.textContent = 'SPACE TO LAUNCH · ESC 返回选关'
@@ -255,6 +283,8 @@ export class HUD {
         e.overlay.classList.remove('show')
       }
     }
+
+    this._updateRotateHint()
 
     // While flying without pointer lock, nudge the hint line (desktop only)
     e.hint.classList.toggle(

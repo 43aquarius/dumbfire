@@ -37,6 +37,16 @@ const isTouch = params.has('touch') ||
 CFG.quality.mobile = isTouch
 CFG.quality.fxScale = isTouch ? 0.5 : 1
 
+// Body class drives ALL touch-specific CSS (chips/hint hidden, bigger tap
+// targets). Width-based media queries used to leak the desktop HUD onto
+// landscape phones — 844px wide > 760px breakpoint.
+if (isTouch) document.body.classList.add('is-touch')
+
+// iOS Safari pinch-zoom / double-tap guards (it ignores user-scalable=no)
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) {
+  window.addEventListener(ev, (e) => e.preventDefault(), { passive: false })
+}
+
 // ---- best-run persistence ---------------------------------------------------
 const bestKey = (id) => `dumbfire_best_v1_${id}`
 const getBest = (id) => {
@@ -66,7 +76,9 @@ async function main () {
 
   // Presentation layer
   const effects = new Effects(scene)
-  const cameraRig = new CameraRig(scene.camera, missile)
+  const cameraRig = new CameraRig(scene.camera, missile, { mobile: isTouch })
+  // Portrait phones get extra vertical FOV so the horizontal view stays flyable
+  scene.onResize(() => { cameraRig.fovMul = scene.fovMul })
 
   // HUD first — its callbacks close over `game`, which is assigned right
   // after; they only ever run on user interaction, by which time it exists.
@@ -88,7 +100,8 @@ async function main () {
     levels: LEVELS, getBest, setBest, touch: null
   })
 
-  // On-screen controls for touch devices (hidden on desktop unless ?touch=1)
+  // On-screen controls for touch devices (hidden on desktop unless ?touch=1).
+  // Hidden at boot — the menu overlays the screen; selectLevel() shows them.
   let touch = null
   if (isTouch) {
     touch = new TouchControls(input, {
@@ -98,7 +111,6 @@ async function main () {
       onMenu: () => game.toMenu()
     })
     game.touch = touch
-    touch.setVisible(true) // menu overlays it, but ready/flying need it
   }
 
   // Pointer lock drives pause / menu / ready panel text

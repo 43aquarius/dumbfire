@@ -27,10 +27,12 @@ export const CFG = {
     halfExtents: { x: 0.38, y: 0.38, z: 1.55 },  // box-collider half sizes
     colliderOffsetZ: -0.35,                      // collider centre pushed toward nose
     // --- touch steering (virtual joystick) ---
-    touchYawRate: 2.15,      // rad/s at full stick deflection
-    touchPitchRate: 1.75,   // rad/s at full stick deflection
-    touchExpo: 1.55,        // stick response curve exponent (>1 = finer near centre)
-    touchDeadzone: 0.11     // ignore jitter below this deflection
+    touchYawRate: 2.6,      // rad/s at full stick deflection
+    touchPitchRate: 2.05,   // rad/s at full stick deflection
+    touchExpo: 1.35,        // stick response curve exponent (>1 = finer near centre)
+    touchDeadzone: 0.07,    // ignore jitter below this deflection
+    touchSmooth: 26,        // stick low-pass rate (1/s) — de-jitters noisy touch
+    touchTapMs: 280         // press shorter than this counts as a TAP (latch/toggle)
   },
 
   boost: {
@@ -70,7 +72,11 @@ export const CFG = {
     rollLean: 0.24,                   // camera rolls into turns with the missile bank
     shakeDecay: 1.5,                  // trauma decay (1/s)
     menuRadius: 46,                   // slow orbit radius on the menu screen
-    menuHeight: 22
+    menuHeight: 22,
+    // --- touch / portrait compensation ---
+    touchFovBoost: 4.5,               // extra base FOV on phones (small screens need context)
+    touchPullbackMul: 1.18,           // camera sits further back on touch (thumbs occlude)
+    portraitFovCap: 104               // max vertical FOV when held in portrait (deg)
   },
 
   trail: {

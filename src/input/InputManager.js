@@ -144,6 +144,23 @@ export class InputManager {
   vUp (code) { this.vKeys.delete(code) }
 
   /**
+   * Nuke every held key, button and accumulated delta — physical AND the
+   * touch virtual layer. Used when the page is hidden or focus is lost,
+   * so a swallowed keyup/touchend can never leave ghost input behind.
+   */
+  clearAll () {
+    this.keys.clear()
+    this.buttons.clear()
+    this.vKeys.clear()
+    this.pressed.clear()
+    this.released.clear()
+    this.buttonPressed.clear()
+    this.vPressed.clear()
+    this.mouse.dx = 0
+    this.mouse.dy = 0
+  }
+
+  /**
    * Drain the accumulated mouse delta and reset it to zero.
    * Returns {dx, dy} in pixels.
    */

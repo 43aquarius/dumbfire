@@ -19,9 +19,14 @@ const _off = new THREE.Vector3()
 const _fwd = new THREE.Vector3()
 
 export class CameraRig {
-  /** @param {THREE.PerspectiveCamera} camera */
-  constructor (camera, missile) {
+  /**
+   * @param {THREE.PerspectiveCamera} camera
+   * @param {Missile} missile (for the initial framing only)
+   * @param {{mobile?: boolean}} opts touch profile — wider FOV + more pull-back
+   */
+  constructor (camera, missile, opts = {}) {
     this.cam = camera
+    this.mobile = !!opts.mobile
     this.pos = new THREE.Vector3()
     this.look = new THREE.Vector3()
     this.trauma = 0
@@ -29,6 +34,8 @@ export class CameraRig {
     this._orbit = 0
     this._lean = 0
     this.fov = CFG.camera.fovBase
+    /** Portrait FOV compensation — set by the GameScene via onResize(). */
+    this.fovMul = 1
 
     // Start framed on the missile waiting on the pad
     _off.set(CFG.camera.offset.x, CFG.camera.offset.y, CFG.camera.offset.z)
@@ -71,7 +78,8 @@ export class CameraRig {
     } else {
       const m = ctx.missile
       // speed-based pull-back — camera trails further out at high speed
-      const pull = CFG.camera.pullbackMax *
+      // (touch devices pull back a touch more: thumbs + small screens)
+      const pull = CFG.camera.pullbackMax * (this.mobile ? CFG.camera.touchPullbackMul : 1) *
         Math.min(1, (ctx.speed || 0) / CFG.camera.pullbackSpeed)
       _off.set(
         CFG.camera.offset.x,
@@ -106,13 +114,16 @@ export class CameraRig {
     this.cam.lookAt(this.look)
 
     // FOV state — thrust / boost / bullet-time / raw speed
-    let targetFov = CFG.camera.fovBase
+    // (phones start a little wider; portrait phones get extra vertical FOV
+    //  through fovMul so the horizontal view stays flyable)
+    let targetFov = CFG.camera.fovBase +
+      (this.mobile ? CFG.camera.touchFovBoost : 0)
     if (ctx.boostActive) targetFov = CFG.camera.fovBoost
     else if (ctx.thrusting) targetFov = CFG.camera.fovThrust
     if (ctx.slowmo) targetFov += CFG.camera.fovSlowmoDelta
     targetFov += CFG.camera.fovSpeedMax *
       Math.min(1, (ctx.speed || 0) / CFG.camera.pullbackSpeed)
-    this.fov = THREE.MathUtils.damp(this.fov, targetFov, 5, dt)
+    this.fov = THREE.MathUtils.damp(this.fov, targetFov * this.fovMul, 5, dt)
     this.cam.fov = this.fov
     this.cam.updateProjectionMatrix()
   }

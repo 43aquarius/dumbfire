@@ -53,6 +53,14 @@ export class Game {
     // Route Rapier collision events into the state machine
     this.physics.onCollision = (h1, h2, started) => this._onCollision(h1, h2, started)
 
+    // Backgrounding the app can swallow keyup/touchend — never leave ghost
+    // input (especially a LATCHED engine) behind when we come back.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) return
+      this.input.clearAll()
+      if (this.touch) this.touch.releaseAll()
+    })
+
     // Boot into the menu with level 1 as the backdrop
     this.loadLevel(0)
     this.hud.menu()
@@ -83,6 +91,9 @@ export class Game {
     this.acc = 0
     this.paused = false
     this._fxRamp = 1
+
+    // a latched engine from the previous run must not auto-launch the next
+    if (this.touch) this.touch.releaseAll()
 
     this.missile.reset(def.spawn, def.spawn.yaw || 0)
     this.grapple.release()
@@ -154,6 +165,9 @@ export class Game {
     this.effects.explosionAt(this.crashPoint)
     this.cameraRig.addTrauma(1.0)
 
+    // drop any held/latched touch input so the auto-restart starts clean
+    if (this.touch) this.touch.releaseAll()
+
     this.missile.setVisible(false)
     this.grapple.release()
     this.chute.reset()
@@ -166,6 +180,10 @@ export class Game {
     if (this.state !== 'flying') return
     this.state = 'complete'
     this.stateTimer = 0
+
+    // free the touch layer: no latched engine / held buttons under the
+    // end-of-run overlay, and the flight cluster itself isn't needed now
+    if (this.touch) { this.touch.releaseAll(); this.touch.setVisible(false) }
 
     const def = this.levels[this.levelIndex]
     const prevBest = this.getBest(def.id)

@@ -219,8 +219,8 @@ export function buildTextures () {
           }
         } else {
           // daylight glass: blue-grey with per-window brightness variation
-          const v = 118 + ((Math.random() * 54) | 0)
-          ctx.fillStyle = `rgb(${(v * 0.82) | 0},${(v * 0.94) | 0},${v + 24 > 255 ? 255 : v + 24})`
+          const v = 134 + ((Math.random() * 56) | 0)
+          ctx.fillStyle = `rgb(${(v * 0.84) | 0},${(v * 0.95) | 0},${v + 26 > 255 ? 255 : v + 26})`
         }
         ctx.fillRect(x, y, w, h)
       }
@@ -283,6 +283,67 @@ export function buildTextures () {
 
   CACHE = { concrete, dark, girder, hazard, accent, ground, puff, windowsDay, windowsNight, metalPanel, lava }
   return CACHE
+}
+
+// ---- tutorial / guidance sign faces (cached — shared across levels) ----
+const SIGN_CACHE = new Map()
+
+/**
+ * Big readable instruction billboard texture: bright panel, accent border,
+ * bold headline + optional sub-line. Cached by content so re-entering a
+ * level never re-rasterises the same sign.
+ */
+export function makeSignTexture (main, sub, accent = '#ff6a2b') {
+  const key = `${main}|${sub || ''}|${accent}`
+  if (SIGN_CACHE.has(key)) return SIGN_CACHE.get(key)
+
+  const W = 1024
+  const H = 384
+  const c = document.createElement('canvas')
+  c.width = W
+  c.height = H
+  const g = c.getContext('2d')
+
+  // bright panel + subtle top-to-bottom wash
+  g.fillStyle = '#f7f8f3'
+  g.fillRect(0, 0, W, H)
+  const wash = g.createLinearGradient(0, 0, 0, H)
+  wash.addColorStop(0, 'rgba(255,255,255,0.65)')
+  wash.addColorStop(1, 'rgba(216,222,228,0.4)')
+  g.fillStyle = wash
+  g.fillRect(0, 0, W, H)
+
+  // accent frame + header strip
+  g.strokeStyle = accent
+  g.lineWidth = 20
+  g.strokeRect(16, 16, W - 32, H - 32)
+  g.fillStyle = accent
+  g.fillRect(16, 16, W - 32, 26)
+
+  const FONT = `'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans SC',Arial,sans-serif`
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillStyle = '#161a20'
+  g.font = `900 ${sub ? 104 : 124}px ${FONT}`
+  g.fillText(main, W / 2, sub ? 168 : 208)
+  if (sub) {
+    g.font = `700 52px ${FONT}`
+    g.fillStyle = '#3a424c'
+    g.fillText(sub, W / 2, 292)
+  }
+  // corner screws — a little hardware detail
+  g.fillStyle = 'rgba(30,34,40,0.5)'
+  for (const [x, y] of [[52, 60], [W - 52, 60], [52, H - 52], [W - 52, H - 52]]) {
+    g.beginPath()
+    g.arc(x, y, 10, 0, Math.PI * 2)
+    g.fill()
+  }
+
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 8
+  SIGN_CACHE.set(key, tex)
+  return tex
 }
 
 /**

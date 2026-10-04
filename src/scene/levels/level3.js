@@ -13,7 +13,7 @@
 export const LEVEL_3 = {
   id: 'sky-gauntlet',
   name: 'SKY GAUNTLET',
-  subtitle: '天空回廊 · 无底深渊',
+  subtitle: '天空回廊 · 晴空深渊',
   difficulty: 3,
 
   spawn: { x: 0, y: 27, z: 50, yaw: 0 },
@@ -22,16 +22,16 @@ export const LEVEL_3 = {
   menuFocus: [0, 26, -120],
 
   palette: {
-    skyZenith: 0x232a4d,
-    skyHorizon: 0xd77a6a,
-    skyGround: 0x1c1830,
-    fogColor: 0x4a4266, fogNear: 40, fogFar: 480,
-    sunColor: 0xff8866, sunIntensity: 1.6, sunOffset: [0.7, 0.2, -0.4],
-    hemiSky: 0x8a7ab8, hemiGround: 0x302840, hemiIntensity: 0.8,
-    concrete: 0x8a8fa8, dark: 0x6a7088, girder: 0x565e75, accent: 0x35c9d9,
-    mountain: 0x3a3a55, cloud: 0x9a86c0, cloudOpacity: 0.4,
-    ground: 0x35304a, groundY: -72,
-    facade: 0x6a7288, trim: 0x3a4152, windowsNight: true
+    skyZenith: 0x6ea8e8,
+    skyHorizon: 0xf0ead8,
+    skyGround: 0x6a7484,
+    fogColor: 0xdce4ea, fogNear: 50, fogFar: 560,
+    sunColor: 0xfff2dd, sunIntensity: 2.6, sunOffset: [55, 90, 35],
+    hemiSky: 0xf0f4fb, hemiGround: 0x5a6474, hemiIntensity: 1.0,
+    concrete: 0xb2bcc8, dark: 0x98a4b4, girder: 0x74808c, accent: 0x35c9d9,
+    mountain: 0x8a96a6, cloud: 0xffffff, cloudOpacity: 0.6,
+    ground: 0x8a94a4, groundY: -72,
+    facade: 0xb8c2ce, trim: 0x545e6a
   },
 
   boxes: [

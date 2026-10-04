@@ -12,7 +12,7 @@
 export const LEVEL_2 = {
   id: 'red-canyon',
   name: 'RED CANYON',
-  subtitle: '赤色峡谷 · 落日穿行',
+  subtitle: '赤色峡谷 · 晴日穿行',
   difficulty: 2,
 
   spawn: { x: 0, y: 12, z: 62, yaw: 0 },
@@ -21,16 +21,16 @@ export const LEVEL_2 = {
   menuFocus: [0, 10, -140],
 
   palette: {
-    skyZenith: 0x5a4a7a,
-    skyHorizon: 0xff9a5e,
-    skyGround: 0x6e4436,
-    fogColor: 0xe8956a, fogNear: 45, fogFar: 620,
-    sunColor: 0xffb070, sunIntensity: 2.3, sunOffset: [0.8, 0.26, 0.5],
-    hemiSky: 0xffc9a0, hemiGround: 0x5a4038, hemiIntensity: 0.85,
-    concrete: 0xb08268, dark: 0x94644e, girder: 0x6b5a55, accent: 0xd95f2b,
-    mountain: 0x8a5a48, cloud: 0xffb890, cloudOpacity: 0.55,
-    ground: 0xa5654d, groundY: -2.05,
-    facade: 0xb08a6e, trim: 0x6e5244
+    skyZenith: 0x7a8ec8,
+    skyHorizon: 0xffd9a2,
+    skyGround: 0x8a6a56,
+    fogColor: 0xf0d0a8, fogNear: 50, fogFar: 640,
+    sunColor: 0xffc890, sunIntensity: 2.6, sunOffset: [65, 70, 42],
+    hemiSky: 0xffe0c0, hemiGround: 0x6a5044, hemiIntensity: 0.95,
+    concrete: 0xc09474, dark: 0xa87860, girder: 0x7c6c64, accent: 0xd95f2b,
+    mountain: 0xa87860, cloud: 0xffd0b0, cloudOpacity: 0.65,
+    ground: 0xb87a5e, groundY: -2.05,
+    facade: 0xc09c7e, trim: 0x7c5e4c
   },
 
   boxes: [

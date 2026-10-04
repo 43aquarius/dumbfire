@@ -41,12 +41,18 @@ export class GameScene {
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.05
+    this.renderer.toneMappingExposure = 1.12 // airy, never-murky baseline
     container.appendChild(this.renderer.domElement)
 
     this.scene = new THREE.Scene()
     this.scene.background = null // sky dome covers everything
     this.scene.fog = new THREE.Fog(0xc6d0da, 60, 560) // re-tinted per level
+
+    // Procedural IBL environment — a tiny equirect sky/ground gradient run
+    // through PMREM. Gives every standard material (glass, painted hull,
+    // steel) soft image-based reflections + ambient bounce, which is most of
+    // what makes models read as "detailed" at gameplay distance.
+    this._buildEnvironment()
 
     this.camera = new THREE.PerspectiveCamera(
       74, window.innerWidth / window.innerHeight, 0.1, 2000
@@ -68,6 +74,7 @@ export class GameScene {
     sun.castShadow = true
     sun.shadow.mapSize.set(this.mobile ? 1024 : 2048, this.mobile ? 1024 : 2048)
     const fr = this.mobile ? 60 : 75
+    this._fr = fr
     sun.shadow.camera.left = -fr
     sun.shadow.camera.right = fr
     sun.shadow.camera.top = fr
@@ -103,6 +110,39 @@ export class GameScene {
 
   get canvas () { return this.renderer.domElement }
 
+  /** Small procedural equirect environment -> PMREM -> scene.environment. */
+  _buildEnvironment () {
+    const c = document.createElement('canvas')
+    c.width = 256
+    c.height = 128
+    const g = c.getContext('2d')
+    // sky -> horizon -> ground, tuned bright and neutral so it never
+    // darkens any palette
+    const grad = g.createLinearGradient(0, 0, 0, 128)
+    grad.addColorStop(0.0, '#a8ccf0')
+    grad.addColorStop(0.46, '#f2f5f8')
+    grad.addColorStop(0.54, '#ded6c6')
+    grad.addColorStop(1.0, '#9a9384')
+    g.fillStyle = grad
+    g.fillRect(0, 0, 256, 128)
+    // soft sun blob in the "sky" half
+    const sg = g.createRadialGradient(66, 30, 2, 66, 30, 30)
+    sg.addColorStop(0, 'rgba(255,252,240,1)')
+    sg.addColorStop(1, 'rgba(255,252,240,0)')
+    g.fillStyle = sg
+    g.fillRect(0, 0, 256, 128)
+
+    const tex = new THREE.CanvasTexture(c)
+    tex.mapping = THREE.EquirectangularReflectionMapping
+    tex.colorSpace = THREE.SRGBColorSpace
+    const pmrem = new THREE.PMREMGenerator(this.renderer)
+    const rt = pmrem.fromEquirectangular(tex)
+    tex.dispose()
+    pmrem.dispose()
+    this.scene.environment = rt.texture
+    this.scene.environmentIntensity = 0.45
+  }
+
   /** Big visual-only ground disc extending the terrain to the horizon. */
   _buildGround () {
     const geo = new THREE.CircleGeometry(2400, 48)
@@ -132,6 +172,19 @@ export class GameScene {
     this.sun.color.set(p.sunColor)
     this.sun.intensity = p.sunIntensity
     this.sunOffset.set(p.sunOffset[0], p.sunOffset[1], p.sunOffset[2])
+
+    // Vertical courses spread the action over hundreds of metres of Y —
+    // give them a wider shadow frustum so towers stay shadowed near the top.
+    const fr = p.shadowFrustum || (this.mobile ? 60 : 75)
+    if (fr !== this._fr) {
+      this._fr = fr
+      this.sun.shadow.camera.left = -fr
+      this.sun.shadow.camera.right = fr
+      this.sun.shadow.camera.top = fr
+      this.sun.shadow.camera.bottom = -fr
+      this.sun.shadow.camera.far = Math.max(320, fr * 5.2)
+      this.sun.shadow.camera.updateProjectionMatrix()
+    }
 
     this.skybox.applyPalette(p)
     this._groundMat.color.set(p.ground)

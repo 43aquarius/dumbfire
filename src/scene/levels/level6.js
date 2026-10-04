@@ -11,7 +11,7 @@
 export const LEVEL_6 = {
   id: 'magma-core',
   name: 'MAGMA CORE',
-  subtitle: '熔岩之心 · 玄武长峡',
+  subtitle: '熔岩之心 · 白垩火山',
   difficulty: 3,
 
   spawn: { x: 0, y: 12, z: 58, yaw: 0 },
@@ -20,16 +20,16 @@ export const LEVEL_6 = {
   menuFocus: [0, 14, -140],
 
   palette: {
-    skyZenith: 0x140b10,
-    skyHorizon: 0x69290f,
-    skyGround: 0x1a1210,
-    fogColor: 0x361810, fogNear: 40, fogFar: 470,
-    sunColor: 0xff8a4a, sunIntensity: 1.4, sunOffset: [0.65, 0.3, -0.45],
-    hemiSky: 0x5a3828, hemiGround: 0x1e1410, hemiIntensity: 0.6,
-    concrete: 0x4a4244, dark: 0x3a3336, girder: 0x463c38, accent: 0xff5a1e,
-    mountain: 0x2c2024, cloud: 0x54382c, cloudOpacity: 0.4, stars: 0.45,
-    ground: 0x201614, groundY: -2.05,
-    facade: 0x5a4a48, trim: 0x2c2422
+    skyZenith: 0x9aa8c0,
+    skyHorizon: 0xf2dcc4,
+    skyGround: 0x6a5e58,
+    fogColor: 0xe0d4c8, fogNear: 55, fogFar: 560,
+    sunColor: 0xfff0dc, sunIntensity: 2.6, sunOffset: [60, 90, 40],
+    hemiSky: 0xf4ece0, hemiGround: 0x6a5e56, hemiIntensity: 1.0,
+    concrete: 0xa89a90, dark: 0x94867e, girder: 0x7c7470, accent: 0xff5a1e,
+    mountain: 0x9a8e84, cloud: 0xffffff, cloudOpacity: 0.5,
+    ground: 0x8a7c72, groundY: -2.05,
+    facade: 0xb0a498, trim: 0x5c524c
   },
 
   boxes: [

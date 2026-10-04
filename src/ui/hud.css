@@ -307,6 +307,17 @@
   letter-spacing: 3px;
   color: #f2f5f8;
 }
+/* small category chip (e.g. 教学) sitting next to the level name */
+.card-tag {
+  flex: none;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #0d1117;
+  background: #ffd24a;
+  border-radius: 3px;
+}
 .card-sub {
   font-size: 12px;
   letter-spacing: 2px;

@@ -81,7 +81,7 @@ Each keeps its own best time in `localStorage`.
 | S | drag chute (hold) |
 | R | restart level |
 | ESC | pause mid-flight / back to the level menu |
-| 1 / 2 / 3 | pick level (menu) |
+| 1 / 2 / ... / 9 / 0 | pick level (menu) |
 | N / M | next level / menu (after completion) |
 
 ## Controls — mobile (touch devices, auto-detected)
@@ -140,12 +140,16 @@ dumbfire/
     │   ├── buildings.js          # procedural composite buildings (towers/slabs/
     │   │                         #   hangars/stacks, window facades, rooftop clutter)
     │   ├── Level.js              # data-driven course builder (disposeable)
+    │   ├── levels/tutorial.js     # FIRST FLIGHT (tutorial)
     │   ├── levels/level1.js      # PILLAR RUN
     │   ├── levels/level2.js      # RED CANYON
     │   ├── levels/level3.js      # SKY GAUNTLET
     │   ├── levels/level4.js      # NEON HARBOR
     │   ├── levels/level5.js      # GLACIER RUN
     │   ├── levels/level6.js      # MAGMA CORE
+    │   ├── levels/level7.js      # TOWER ASCENT (vertical)
+    │   ├── levels/level8.js      # SKY LADDER (vertical)
+    │   ├── levels/level9.js      # ORBITAL SPIRE (vertical)
     │   ├── CameraRig.js          # chase cam, FOV/pull-back/roll-lean, trauma shake
     │   ├── Effects.js            # exhaust / explosions / fireworks facade
     │   └── particles.js           # pooled THREE.Points with a tiny shader

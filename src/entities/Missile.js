@@ -89,13 +89,16 @@ export class Missile {
     const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({
       color, flatShading: true, roughness: 0.6, metalness: 0.25, ...opts
     })
-    const hull = mat(0xdde1e6)                        // light fuselage shell
-    const hullPanel = mat(0xbfc4cb)                   // two-tone panel tone
-    const red = mat(0xd2372a)
-    const dark = mat(0x54595f)
-    const finMat = mat(0x3b3f45)
-    const steel = mat(0x2b2e33, { metalness: 0.75, roughness: 0.32 })
-    const glass = mat(0x101418, { roughness: 0.15, metalness: 0.85 })
+    // finishes tuned for the IBL environment: paint reads glossy, steel and
+    // glass pick up the sky reflection
+    const hull = mat(0xe2e6ea, { roughness: 0.42, metalness: 0.3 })   // light fuselage shell
+    const hullPanel = mat(0xc2c7ce, { roughness: 0.48, metalness: 0.3 }) // two-tone panel tone
+    const red = mat(0xd2372a, { roughness: 0.45 })
+    const dark = mat(0x54595f, { roughness: 0.5, metalness: 0.35 })
+    const finMat = mat(0x3b3f45, { roughness: 0.5, metalness: 0.3 })
+    const steel = mat(0x2b2e33, { metalness: 0.85, roughness: 0.28 })
+    const glass = mat(0x101418, { roughness: 0.1, metalness: 0.9 })
+    const gold = mat(0xc9a44a, { metalness: 0.9, roughness: 0.3 })  // sensor gold trim
 
     // ---- fuselage: lathe profile, tail y=0 -> nose y=4.42 -------------------
     // (radius, profileY): boat-tail -> cylinder -> shoulder -> ogive tip
@@ -114,7 +117,8 @@ export class Missile {
 
     // ---- raised panel seam collars (section joints) ----
     // profile y -> world z = 1.95 - y; radii match the profile at those z
-    for (const [z, r] of [[1.42, 0.466], [-0.10, 0.474], [-0.77, 0.354], [-1.45, 0.354]]) {
+    for (const [z, r] of [[1.42, 0.466], [-0.10, 0.474], [-0.77, 0.354], [-1.45, 0.354],
+      [0.95, 0.470], [-1.78, 0.272]]) {
       const ring = new THREE.Mesh(
         new THREE.CylinderGeometry(r, r, 0.07, 12, 1, true), hullPanel)
       ring.rotation.x = Math.PI / 2
@@ -122,25 +126,42 @@ export class Missile {
       bank.add(ring)
     }
 
-    // ---- forward red band ----
+    // ---- forward red band + aft thin red collar ----
     const band = new THREE.Mesh(
       new THREE.CylinderGeometry(0.354, 0.354, 0.30, 12), red)
     band.rotation.x = Math.PI / 2
     band.position.z = -1.05
     bank.add(band)
+    const band2 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.468, 0.468, 0.10, 12), red)
+    band2.rotation.x = Math.PI / 2
+    band2.position.z = 0.55
+    bank.add(band2)
 
-    // ---- seeker head: glossy black cone + lens ----
+    // ---- pitot probe: classic needle off the nose tip ----
+    const pitot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.016, 0.026, 0.55, 8), steel)
+    pitot.rotation.x = -Math.PI / 2
+    pitot.position.z = -2.68
+    bank.add(pitot)
+
+    // ---- seeker head: glossy black cone + gold-ring lens ----
     const seeker = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.36, 10), glass)
     seeker.rotation.x = -Math.PI / 2 // apex -> -Z
     seeker.position.z = -2.29
     bank.add(seeker)
+    const lensRing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.105, 0.105, 0.045, 10), gold)
+    lensRing.rotation.x = Math.PI / 2
+    lensRing.position.z = -2.13
+    bank.add(lensRing)
     const lens = new THREE.Mesh(
       new THREE.CylinderGeometry(0.075, 0.075, 0.05, 10), glass)
     lens.rotation.x = Math.PI / 2
     lens.position.z = -2.11
     bank.add(lens)
 
-    // ---- dorsal spine + comm blister + antenna blade ----
+    // ---- dorsal spine + comm blister + antenna blades ----
     const spine = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.15, 1.7), hullPanel)
     spine.position.set(0, 0.44, 0.15)
     bank.add(spine)
@@ -150,6 +171,19 @@ export class Missile {
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, 0.38), finMat)
     blade.position.set(-0.13, 0.55, 0.85)
     bank.add(blade)
+    const blade2 = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.14, 0.26), finMat)
+    blade2.position.set(0.15, 0.5, 1.15)
+    bank.add(blade2)
+    // cable conduit riding the spine
+    const conduit = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.03, 0.03, 2.6, 6), dark)
+    conduit.rotation.x = Math.PI / 2
+    conduit.position.set(0, 0.545, 0.4)
+    bank.add(conduit)
+    // belly nav window
+    const belly = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.3), glass)
+    belly.position.set(0, -0.45, -0.62)
+    bank.add(belly)
 
     // ---- side intakes with splitter plates (mid body) ----
     for (const sx of [1, -1]) {
@@ -209,6 +243,15 @@ export class Missile {
       [0.35, -0.26], [0.82, 0.05], [0.82, 0.30], [0.35, 0.28]
     ], 0.055), finMat, -1.5)
 
+    // ---- fin-root actuator fairings: 8 small pods just behind each wing ----
+    for (let k = 0; k < 4; k++) {
+      const ang = (k * Math.PI) / 2 + Math.PI / 4 // between the fins
+      const fair = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.44), dark)
+      fair.position.set(Math.cos(ang) * 0.47, Math.sin(ang) * 0.47, 1.08)
+      fair.rotation.z = ang
+      bank.add(fair)
+    }
+
     // ---- tail: mount ring, ablative collar, nozzle bell ----
     const mount = new THREE.Mesh(
       new THREE.CylinderGeometry(0.31, 0.31, 0.16, 12), steel)
@@ -240,7 +283,7 @@ export class Missile {
     glow.rotation.x = Math.PI / 2 // apex -> +Z (plume tapers rearward)
     glow.position.z = 2.72
     bank.add(glow)
-    for (const [r, z] of [[0.16, 3.0], [0.1, 3.22]]) {
+    for (const [r, z] of [[0.16, 3.0], [0.1, 3.22], [0.065, 3.4]]) {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.024, 6, 14), glowMat)
       ring.position.z = z
       bank.add(ring)

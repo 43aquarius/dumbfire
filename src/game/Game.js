@@ -104,14 +104,14 @@ export class Game {
     this.cameraRig.snapTo(this.missile)
   }
 
-  /** Card click / keys 1-3 — swap course and enter READY. */
+  /** Card click / number keys (1-9, 0 = tenth) — swap course and enter READY. */
   selectLevel (i) {
     if (i < 0 || i >= this.levels.length) return
     this.loadLevel(i)
     this.state = 'ready'
     if (this.touch) this.touch.setVisible(true)
     this.hud.reset(this.levels[i].name)
-    this.hud.setHint(
+    this.hud.setHint(this.levels[i].hint ||
       'MOUSE steer\u2002\u00b7\u2002SPACE thrust\u2002\u00b7\u2002LMB grapple\u2002\u00b7\u2002' +
       'SHIFT boost\u2002\u00b7\u2002RMB slow-mo\u2002\u00b7\u2002S chute\u2002\u00b7\u2002R restart\u2002\u00b7\u2002ESC menu'
     )
@@ -241,9 +241,10 @@ export class Game {
     // Global keys
     if (input.wasPressed('KeyR')) this.restart()
     if (this.state === 'menu') {
-      // number-row + numpad hotkeys for the level select
+      // number-row + numpad hotkeys for the level select (1..9, 0 = tenth)
       for (let i = 0; i < this.levels.length; i++) {
-        if (input.wasPressed(`Digit${i + 1}`) || input.wasPressed(`Numpad${i + 1}`)) {
+        const k = String((i + 1) % 10)
+        if (input.wasPressed(`Digit${k}`) || input.wasPressed(`Numpad${k}`)) {
           this.selectLevel(i)
         }
       }

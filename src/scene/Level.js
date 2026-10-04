@@ -12,7 +12,7 @@
  */
 import * as THREE from 'three'
 import { RAPIER } from '../physics/PhysicsWorld.js'
-import { buildTextures, tiledClone } from './textures.js'
+import { buildTextures, tiledClone, makeSignTexture } from './textures.js'
 import { addBuildings } from './buildings.js'
 
 const _euler = new THREE.Euler()
@@ -459,6 +459,92 @@ export class Level {
         }
         break
       }
+      case 'sign': {
+        // tutorial / guidance billboard — bright panel with big text on two
+        // posts. Face is a cached canvas texture (shared across level swaps).
+        const [w, h] = pr.s
+        const accent = '#' + this.def.palette.accent.toString(16).padStart(6, '0')
+        const face = new THREE.MeshStandardMaterial({
+          map: makeSignTexture(pr.text, pr.sub, accent),
+          roughness: 0.6, metalness: 0.05
+        })
+        const side = new THREE.MeshStandardMaterial({
+          color: this.def.palette.girder, flatShading: true, roughness: 0.7
+        })
+        this._disposables.mats.push(face, side)
+        // BoxGeometry face order: +x -x +y -y +z -z (front & back textured)
+        const panel = new THREE.Mesh(
+          new THREE.BoxGeometry(w, h, 0.28), [side, side, side, side, face, face])
+        panel.position.set(p[0], p[1], p[2])
+        if (pr.rot) panel.rotation.y = pr.rot
+        panel.castShadow = panel.receiveShadow = true
+        this.root.add(panel)
+        this._disposables.geos.push(panel.geometry)
+        // support posts down to the ground (visual)
+        if (pr.post !== false) {
+          const baseY = pr.baseY !== undefined ? pr.baseY : -2
+          const legH = Math.max(0.5, p[1] - h / 2 - baseY)
+          for (const lx of [-w / 2 + 0.8, w / 2 - 0.8]) {
+            const leg = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.18, 0.22, legH, 8),
+              this.mat.girder)
+            leg.position.set(
+              p[0] + Math.cos(pr.rot || 0) * lx,
+              baseY + legH / 2,
+              p[2] - Math.sin(pr.rot || 0) * lx)
+            leg.castShadow = true
+            this.root.add(leg)
+            this._disposables.geos.push(leg.geometry)
+          }
+        }
+        if (pr.col !== false) {
+          const col = this.physics.world.createCollider(
+            RAPIER.ColliderDesc.cuboid(w / 2, h / 2, 0.16)
+              .setTranslation(p[0], p[1], p[2])
+              .setRotation(quatYaw(pr.rot || 0)).setFriction(0.8),
+            this.staticBody)
+          this.physics.tag(col, 'level')
+          this._colliders.push(col)
+        }
+        break
+      }
+      case 'halo': {
+        // horizontal glowing altitude ring (vertical courses) — visual only,
+        // spins slowly so the climb reads as altitude gates
+        const R = pr.r || 30
+        const haloMat = new THREE.MeshStandardMaterial({
+          color: this.def.palette.accent, emissive: this.def.palette.accent,
+          emissiveIntensity: 1.4, flatShading: true, roughness: 0.5
+        })
+        this._disposables.mats.push(haloMat)
+        const halo = new THREE.Mesh(
+          new THREE.TorusGeometry(R, 0.4, 8, 40), haloMat)
+        halo.rotation.x = Math.PI / 2 // lie flat
+        halo.position.set(p[0], p[1], p[2])
+        halo.castShadow = false
+        this.root.add(halo)
+        this._disposables.geos.push(halo.geometry)
+        this._rings.push(halo) // spins in update()
+        break
+      }
+      case 'waterfall': {
+        // translucent spill down a cliff face — visual only
+        const [w, h] = pr.s
+        const wfMat = new THREE.MeshStandardMaterial({
+          color: 0xcfe8f2, emissive: 0xbfe2f2, emissiveIntensity: 0.45,
+          transparent: true, opacity: 0.75, roughness: 0.25, metalness: 0.1
+        })
+        this._disposables.mats.push(wfMat)
+        const m = this._propMesh(new THREE.BoxGeometry(w, h, 1.2), wfMat, p[0], p[1], p[2])
+        m.castShadow = false
+        // mist puff at the base
+        const mist = new THREE.Mesh(
+          new THREE.CylinderGeometry(w * 0.75, w * 1.2, 3, 10), wfMat)
+        mist.position.set(p[0], p[1] - h / 2, p[2])
+        this.root.add(mist)
+        this._disposables.geos.push(mist.geometry)
+        break
+      }
     }
   }
 
@@ -528,9 +614,12 @@ export class Level {
   _buildProps () {
     // small decorations are skipped entirely on weak devices
     if (this.mobile && this.def.props.length > 10) {
-      // keep only landmarks (antennas + rings) on mobile
+      // keep landmarks (antennas, rings, signs) on mobile — signs carry the
+      // tutorial, everything else is eye candy
       for (const pr of this.def.props) {
-        if (pr.t === 'antenna' || pr.t === 'ring') this._addProp(pr)
+        if (pr.t === 'antenna' || pr.t === 'ring' || pr.t === 'sign' || pr.t === 'halo') {
+          this._addProp(pr)
+        }
       }
       return
     }

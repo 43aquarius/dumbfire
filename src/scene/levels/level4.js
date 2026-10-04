@@ -1,5 +1,5 @@
 /**
- * LEVEL 4 — "NEON HARBOR" (midnight / neon metropolis).
+ * LEVEL 4 — "NEON HARBOR" (golden dusk / neon metropolis).
  *
  * Launch from the pier -> thread the gantry cranes -> under the elevated
  * highway -> skyscraper slalom between lit towers -> neon hoop gates ->
@@ -11,7 +11,7 @@
 export const LEVEL_4 = {
   id: 'neon-harbor',
   name: 'NEON HARBOR',
-  subtitle: '霓虹港湾 · 午夜穿梭',
+  subtitle: '霓虹港湾 · 金色黄昏',
   difficulty: 2,
 
   spawn: { x: 0, y: 10, z: 60, yaw: 0 },
@@ -20,16 +20,16 @@ export const LEVEL_4 = {
   menuFocus: [0, 16, -120],
 
   palette: {
-    skyZenith: 0x0a1026,
-    skyHorizon: 0x27334e,
-    skyGround: 0x0d1118,
-    fogColor: 0x131b30, fogNear: 45, fogFar: 540,
-    sunColor: 0xcfe0ff, sunIntensity: 0.55, sunOffset: [-0.5, 0.5, 0.35],
-    hemiSky: 0x2c3a58, hemiGround: 0x141824, hemiIntensity: 0.55,
-    concrete: 0x5a6470, dark: 0x49505c, girder: 0x3e4450, accent: 0x27d8c8,
-    mountain: 0x1c2434, cloud: 0x2e3a56, cloudOpacity: 0.32, stars: 0.9,
-    ground: 0x20293a, groundY: -2.05,
-    facade: 0x8a94a4, trim: 0x2e333c, windowsNight: true
+    skyZenith: 0x3a6ab8,
+    skyHorizon: 0xffcf8e,
+    skyGround: 0x5a6068,
+    fogColor: 0xe8d4b8, fogNear: 55, fogFar: 560,
+    sunColor: 0xffd9a8, sunIntensity: 2.4, sunOffset: [70, 42, 45],
+    hemiSky: 0xf2e0c8, hemiGround: 0x5a5e6a, hemiIntensity: 0.95,
+    concrete: 0x9aa4b0, dark: 0x828c98, girder: 0x6a7480, accent: 0x27d8c8,
+    mountain: 0x8a92a0, cloud: 0xffffff, cloudOpacity: 0.55,
+    ground: 0x9aa0a8, groundY: -2.05,
+    facade: 0xa8b2c0, trim: 0x4c525c
   },
 
   boxes: [

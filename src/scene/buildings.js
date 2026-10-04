@@ -166,6 +166,23 @@ export function addBuildings (level, records) {
       mesh.position.set(lx, topY, lz)
       group.add(mesh)
     }
+    // elevator machine hut (before the rest — sits near the centre)
+    if (rng() < 0.7 && sx > 8 && sz > 8) {
+      const hw = Math.min(6, sx * 0.26)
+      const hd = Math.min(5, sz * 0.3)
+      const hut = new THREE.Mesh(new THREE.BoxGeometry(hw, 2.3, hd), trimMat)
+      const hx = (rng() - 0.5) * (sx - hw - 4)
+      const hz = (rng() - 0.5) * (sz - hd - 4)
+      hut.position.set(hx, topY + 1.15, hz)
+      hut.castShadow = hut.receiveShadow = true
+      group.add(hut)
+      level._disposables.geos.push(hut.geometry)
+      // hut access ladder strip
+      const lad = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.3, 0.08), trimMat)
+      lad.position.set(hx, topY + 1.15, hz - hd / 2 - 0.06)
+      group.add(lad)
+      level._disposables.geos.push(lad.geometry)
+    }
     // water tank
     if (rng() < 0.4) {
       const tank = new THREE.Mesh(
@@ -221,6 +238,7 @@ export function addBuildings (level, records) {
     const rot = opts.rot || 0
     const far = !!opts.far
     const tiers = mobile || far ? 1 : (opts.tiers || (h > 46 ? 3 : 2))
+    const detail = !mobile && !far // full dressing only on desktop close-ups
 
     const group = new THREE.Group()
     group.position.set(x, 0, z)
@@ -228,12 +246,25 @@ export function addBuildings (level, records) {
     level.root.add(group)
 
     // plinth
-    if (!mobile && !far) {
+    if (detail) {
       const pl = new THREE.Mesh(new THREE.BoxGeometry(w + 1.6, 2.4, d + 1.6), roofMat)
       pl.position.set(0, y0 + 1.2, 0)
       pl.castShadow = pl.receiveShadow = true
       group.add(pl)
       level._disposables.geos.push(pl.geometry)
+
+      // entrance: canopy over a dark storefront on the +Z face (toward spawn)
+      const cw = Math.min(w * 0.5, 14)
+      const door = new THREE.Mesh(new THREE.BoxGeometry(cw, 3.2, 0.4), trimMat)
+      door.position.set(0, y0 + 2.6, d / 2 + 0.15)
+      group.add(door)
+      level._disposables.geos.push(door.geometry)
+      const canopy = new THREE.Mesh(
+        new THREE.BoxGeometry(cw + 2.4, 0.5, 3.4), trimMat)
+      canopy.position.set(0, y0 + 4.4, d / 2 + 1.6)
+      canopy.castShadow = true
+      group.add(canopy)
+      level._disposables.geos.push(canopy.geometry)
     }
 
     let yb = y0
@@ -244,10 +275,33 @@ export function addBuildings (level, records) {
       const th = t === tiers - 1 ? h - (yb - y0) : (h / tiers) * (t % 2 === 0 ? 1.06 : 0.94)
       facadeBox(group, 0, yb + th / 2, 0, sw, th, sd)
       if (!opts.noCol) addBoxC(x, yb + th / 2, z, sw, th, sd, rot)
-      if (!mobile && !far) parapet(group, 0, yb + th, 0, sw, sd)
+      if (detail) {
+        parapet(group, 0, yb + th, 0, sw, sd)
+        // setback ledge band — reads as a floor plate between tiers
+        if (t < tiers - 1) {
+          const ledge = new THREE.Mesh(
+            new THREE.BoxGeometry(sw + 0.9, 0.4, sd + 0.9), trimMat)
+          ledge.position.set(0, yb + th - 0.2, 0)
+          ledge.castShadow = true
+          group.add(ledge)
+          level._disposables.geos.push(ledge.geometry)
+        }
+        // corner pilasters — vertical trim that breaks up tall facades
+        if (t === 0 && h > 20) {
+          for (const [px, pz] of [[sw / 2, sd / 2], [sw / 2, -sd / 2],
+            [-sw / 2, sd / 2], [-sw / 2, -sd / 2]]) {
+            const pil = new THREE.Mesh(
+              new THREE.BoxGeometry(0.8, th, 0.8), trimMat)
+            pil.position.set(px, yb + th / 2, pz)
+            pil.castShadow = true
+            group.add(pil)
+            level._disposables.geos.push(pil.geometry)
+          }
+        }
+      }
       yb += th
     }
-    if (!mobile && !far) roofProps(group, yb, Math.max(4, w * (1 - 0.8 / 2.4)), Math.max(4, d * (1 - 0.8 / 2.4)), 0, h)
+    if (detail) roofProps(group, yb, Math.max(4, w * (1 - 0.8 / 2.4)), Math.max(4, d * (1 - 0.8 / 2.4)), 0, h)
   }
 
   function buildSlab (x, z, w, d, h, opts) {

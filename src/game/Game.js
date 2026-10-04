@@ -241,9 +241,12 @@ export class Game {
     // Global keys
     if (input.wasPressed('KeyR')) this.restart()
     if (this.state === 'menu') {
-      if (input.wasPressed('Digit1')) this.selectLevel(0)
-      if (input.wasPressed('Digit2')) this.selectLevel(1)
-      if (input.wasPressed('Digit3')) this.selectLevel(2)
+      // number-row + numpad hotkeys for the level select
+      for (let i = 0; i < this.levels.length; i++) {
+        if (input.wasPressed(`Digit${i + 1}`) || input.wasPressed(`Numpad${i + 1}`)) {
+          this.selectLevel(i)
+        }
+      }
     } else if (this.state === 'complete') {
       if (input.wasPressed('KeyN')) this.nextLevel()
       if (input.wasPressed('KeyM')) this.toMenu()
@@ -343,7 +346,7 @@ export class Game {
   _updateMenu (dt) {
     // gentle exhaust idle while parked, purely for flavour
     this.missile.forward(_fwd)
-    _tail.set(0, 0, 1.6).applyQuaternion(this.missile.quaternion).add(this.missile.position)
+    _tail.set(0, 0, 2.2).applyQuaternion(this.missile.quaternion).add(this.missile.position)
     this.effects.emitExhaust(dt * 0.5, _tail, _fwd, false, false)
   }
 
@@ -359,7 +362,7 @@ export class Game {
     }
     // Idle engine wisps
     this.missile.forward(_fwd)
-    _tail.set(0, 0, 1.6).applyQuaternion(this.missile.quaternion).add(this.missile.position)
+    _tail.set(0, 0, 2.2).applyQuaternion(this.missile.quaternion).add(this.missile.position)
     this.effects.emitExhaust(dt, _tail, _fwd, false, false)
 
     if (input.wasPressed('Space')) this.startRun()
@@ -389,7 +392,7 @@ export class Game {
         missile.applyKick(_fwd, CFG.boost.kick)
         this.cameraRig.addTrauma(0.24)
         missile.forward(_fwd)
-        _tail.set(0, 0, 1.6).applyQuaternion(missile.quaternion).add(missile.position)
+        _tail.set(0, 0, 2.2).applyQuaternion(missile.quaternion).add(missile.position)
         this.effects.emitExhaust(0.06, _tail, _fwd, true, true)
       }
     }
@@ -442,7 +445,7 @@ export class Game {
 
     // 8) Exhaust trail
     missile.forward(_fwd)
-    _tail.set(0, 0, 1.6).applyQuaternion(missile.quaternion).add(p)
+    _tail.set(0, 0, 2.2).applyQuaternion(missile.quaternion).add(p)
     this.effects.emitExhaust(dt, _tail, _fwd, input.isDown('Space'), boost.active)
     if (chute.deployed) this.effects.emitChutePuff(dt, _tail)
   }

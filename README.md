@@ -37,19 +37,37 @@ npm run test:physics
 
 ## Levels
 
-Three courses, selected from the in-game menu (click a card or press 1/2/3).
+Six courses, selected from the in-game menu (click a card or press 1-6).
 Each keeps its own best time in `localStorage`.
 
-1. **PILLAR RUN** — day-lit industrial training grounds: girder gate,
-   pillar slalom, window wall, half pyramid, slope + arch, kicker ramp,
-   target tower.
+1. **PILLAR RUN** — day-lit industrial grounds: girder gate, pillar
+   slalom, window wall, half pyramid, slope + arch, kicker, then the
+   industrial-district extension: cooling towers, a container yard,
+   pipeline bridge, twin windows, gantry cranes, a helix ramp and the
+   final pillar canyon to the target tower. City towers flank the run.
 2. **RED CANYON** — sunset serpentine slot: rock fins, a narrow slot,
-   a tunnel, an open bowl with a grapple spire, a natural arch, then a dive
-   into the pit where the target sits on a low spire.
+   a tunnel, an open bowl with a grapple spire, a natural arch, a dive
+   into the pit, then the climb onto the high plateau: mesa forest,
+   twin slots, a giant natural bridge, a hoodoo garden and the final
+   amphitheater.
 3. **SKY GAUNTLET** — dusk chain of floating islands over an abyss:
-   gaps that need thrust + boost, a beam bridge, a central monolith to
-   swing around, a pumphouse fly-through and stepping stones. Falling is
-   a crash; the grapple is not optional.
+   hop chain, beam bridge, central monolith swing, pumphouse
+   fly-through, stepping stones, a suspension bridge you can fly under,
+   split-path islands, a collidable hoop-gate gauntlet, a helix climb
+   and the final sky citadel. Falling is a crash; the grapple is not
+   optional.
+4. **NEON HARBOR** — midnight metropolis: lit-window skyscrapers,
+   gantry cranes with hanging hooks, an elevated highway to dive under,
+   a skyscraper slalom, neon hoop gates, rooftop hops and a mega
+   billboard wall, with the target hanging inside the final harbor
+   crane. Night facades use an emissive window texture.
+5. **GLACIER RUN** — arctic noon on a glacier tongue: frozen gates,
+   crevasse leaps, an ice cave, a frozen arch with icicles, a bowl with
+   a grapple monolith, a glowing shard forest and the ice caldera.
+6. **MAGMA CORE** — volcanic night through basalt corridors: hex gates,
+   lava-lake crossings on stone pillars, obsidian shard slaloms, a
+   magma chamber, the lava-fall wall window, a hex terrace climb and
+   the volcanic amphitheater.
 
 ## Controls — desktop
 
@@ -117,11 +135,17 @@ dumbfire/
     ├── scene/
     │   ├── GameScene.js         # renderer / lights / fog / per-level palette
     │   ├── Skybox.js             # shader sky dome + mountains + drifting clouds
-    │   ├── textures.js           # procedural canvas textures (concrete/girder/hazard)
+    │   ├── textures.js           # procedural canvas textures (concrete/girder/hazard/
+    │   │                         #   windows day+night/metal panel/lava)
+    │   ├── buildings.js          # procedural composite buildings (towers/slabs/
+    │   │                         #   hangars/stacks, window facades, rooftop clutter)
     │   ├── Level.js              # data-driven course builder (disposeable)
     │   ├── levels/level1.js      # PILLAR RUN
     │   ├── levels/level2.js      # RED CANYON
     │   ├── levels/level3.js      # SKY GAUNTLET
+    │   ├── levels/level4.js      # NEON HARBOR
+    │   ├── levels/level5.js      # GLACIER RUN
+    │   ├── levels/level6.js      # MAGMA CORE
     │   ├── CameraRig.js          # chase cam, FOV/pull-back/roll-lean, trauma shake
     │   ├── Effects.js            # exhaust / explosions / fireworks facade
     │   └── particles.js           # pooled THREE.Points with a tiny shader

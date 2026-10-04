@@ -141,8 +141,10 @@ export class HUD {
   _renderMenu () {
     const cards = this.levels.map((lv, i) => {
       const best = this._getBest(lv.id)
+      const tint = lv.palette && lv.palette.accent !== undefined
+        ? `#${lv.palette.accent.toString(16).padStart(6, '0')}` : '#c9522f'
       return `
-        <div class="card" data-i="${i}">
+        <div class="card" data-i="${i}" style="--card-tint:${tint}">
           <div class="card-head">
             <span class="card-idx">${i + 1}</span>
             <span class="card-name">${lv.name}</span>
@@ -153,9 +155,10 @@ export class HUD {
         </div>`
     }).join('')
     this.el.menuCards.innerHTML = cards
+    const keys = this.levels.map((_, i) => i + 1).join(' / ')
     this.el.menuFoot.textContent = this.mobile
       ? '点击卡片开始 · 左半屏摇杆转向 · 轻点 THRUST 锁定引擎'
-      : '点击卡片或按 1 / 2 / 3 选择关卡'
+      : `点击卡片或按 ${keys} 选择关卡`
 
     this.el.menuCards.querySelectorAll('.card').forEach((card) => {
       card.addEventListener('click', () => {

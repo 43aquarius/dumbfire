@@ -74,12 +74,12 @@ export class Missile {
     this.engineLight = null
     if (!this.mobile) {
       this.engineLight = new THREE.PointLight(0xff7a33, 0, 22, 2)
-      this.engineLight.position.set(0, 0, 1.8)
+      this.engineLight.position.set(0, 0, 2.3)
       this.mesh.add(this.engineLight)
     }
   }
 
-  /** Build the low-poly blocky missile mesh (root group + bank group). */
+  /** Build the detailed low-poly missile mesh (root group + bank group). */
   _buildMesh () {
     const root = new THREE.Group()
     const bank = new THREE.Group() // cosmetic roll only, physics stays yaw/pitch
@@ -89,96 +89,162 @@ export class Missile {
     const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({
       color, flatShading: true, roughness: 0.6, metalness: 0.25, ...opts
     })
-    const hull = mat(0xd8dbe0)
-    const hullDark = mat(0xb9bdc4)
+    const hull = mat(0xdde1e6)                        // light fuselage shell
+    const hullPanel = mat(0xbfc4cb)                   // two-tone panel tone
     const red = mat(0xd2372a)
     const dark = mat(0x54595f)
     const finMat = mat(0x3b3f45)
+    const steel = mat(0x2b2e33, { metalness: 0.75, roughness: 0.32 })
+    const glass = mat(0x101418, { roughness: 0.15, metalness: 0.85 })
 
-    // --- fuselage: main body + darker belly spine (two-tone panelling) ---
-    const fuselage = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 2.6), hull)
+    // ---- fuselage: lathe profile, tail y=0 -> nose y=4.42 -------------------
+    // (radius, profileY): boat-tail -> cylinder -> shoulder -> ogive tip
+    const prof = [
+      [0.30, 0.00], [0.40, 0.10], [0.47, 0.40], [0.47, 2.05],
+      [0.44, 2.40], [0.35, 2.72], [0.35, 3.40], [0.29, 3.62],
+      [0.21, 3.86], [0.13, 4.08], [0.055, 4.26], [0.0, 4.42]
+    ]
+    const fuselage = new THREE.Mesh(
+      new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 12),
+      hull
+    )
+    fuselage.rotation.x = -Math.PI / 2 // +Y profile axis -> -Z (nose forward)
+    fuselage.position.z = 1.95         // tail z=+1.95, nose tip z=-2.47
     bank.add(fuselage)
-    const spine = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.2, 2.6), hullDark)
-    spine.position.y = -0.27
-    bank.add(spine)
 
-    // --- nose section: red band, segmented collar, 4-segment cone tip ---
-    const band = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.74, 0.32), red)
-    band.position.z = -0.55
+    // ---- raised panel seam collars (section joints) ----
+    // profile y -> world z = 1.95 - y; radii match the profile at those z
+    for (const [z, r] of [[1.42, 0.466], [-0.10, 0.474], [-0.77, 0.354], [-1.45, 0.354]]) {
+      const ring = new THREE.Mesh(
+        new THREE.CylinderGeometry(r, r, 0.07, 12, 1, true), hullPanel)
+      ring.rotation.x = Math.PI / 2
+      ring.position.z = z
+      bank.add(ring)
+    }
+
+    // ---- forward red band ----
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.354, 0.354, 0.30, 12), red)
+    band.rotation.x = Math.PI / 2
+    band.position.z = -1.05
     bank.add(band)
 
-    const collar = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.66, 0.5), dark)
-    collar.position.z = -0.95
-    bank.add(collar)
-
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.2, 4), red)
-    nose.rotation.x = -Math.PI / 2 // apex points -Z (forward)
-    nose.position.z = -1.9
-    bank.add(nose)
-
-    // seeker window — tiny glossy black wedge on the nose tip
-    const seeker = new THREE.Mesh(
-      new THREE.BoxGeometry(0.22, 0.22, 0.22),
-      mat(0x101418, { roughness: 0.15, metalness: 0.85 })
-    )
-    seeker.position.z = -2.32
+    // ---- seeker head: glossy black cone + lens ----
+    const seeker = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.36, 10), glass)
+    seeker.rotation.x = -Math.PI / 2 // apex -> -Z
+    seeker.position.z = -2.29
     bank.add(seeker)
+    const lens = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.075, 0.075, 0.05, 10), glass)
+    lens.rotation.x = Math.PI / 2
+    lens.position.z = -2.11
+    bank.add(lens)
 
-    // --- mid-body: side intakes + canard fins ---
-    for (const x of [0.41, -0.41]) {
-      const intake = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.34, 0.9), dark)
-      intake.position.set(x, 0, -0.15)
-      bank.add(intake)
-    }
-    const canardGeoX = new THREE.BoxGeometry(0.5, 0.09, 0.34)
-    const canardGeoY = new THREE.BoxGeometry(0.09, 0.5, 0.34)
-    for (const [geo, x, y] of [
-      [canardGeoX, 0.5, 0], [canardGeoX, -0.5, 0],
-      [canardGeoY, 0, 0.5], [canardGeoY, 0, -0.5]
-    ]) {
-      const canard = new THREE.Mesh(geo, finMat)
-      canard.position.set(x, y, -0.4)
-      bank.add(canard)
-    }
+    // ---- dorsal spine + comm blister + antenna blade ----
+    const spine = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.15, 1.7), hullPanel)
+    spine.position.set(0, 0.44, 0.15)
+    bank.add(spine)
+    const blister = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.09, 0.34), dark)
+    blister.position.set(0.17, 0.36, -1.25)
+    bank.add(blister)
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, 0.38), finMat)
+    blade.position.set(-0.13, 0.55, 0.85)
+    bank.add(blade)
 
-    // --- tail: ring, 4 fins with swept tips, nozzle ---
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.5), dark)
-    tail.position.z = 1.25
-    bank.add(tail)
-
-    const finGeoX = new THREE.BoxGeometry(0.95, 0.14, 0.8)
-    const finGeoY = new THREE.BoxGeometry(0.14, 0.95, 0.8)
-    for (const [geo, x, y] of [
-      [finGeoX, 0.62, 0], [finGeoX, -0.62, 0],
-      [finGeoY, 0, 0.62], [finGeoY, 0, -0.62]
-    ]) {
-      const fin = new THREE.Mesh(geo, finMat)
-      fin.position.set(x, y, 0.95)
-      bank.add(fin)
-      // swept tip plate
-      const tipGeo = new THREE.BoxGeometry(
-        geo === finGeoX ? 0.4 : 0.12, geo === finGeoX ? 0.12 : 0.4, 0.42
-      )
-      const tip = new THREE.Mesh(tipGeo, red)
-      tip.position.set(x * 1.12, y * 1.12, 1.22)
-      bank.add(tip)
+    // ---- side intakes with splitter plates (mid body) ----
+    for (const sx of [1, -1]) {
+      const scoop = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.32, 0.9), hullPanel)
+      scoop.position.set(sx * 0.5, 0, -0.15)
+      bank.add(scoop)
+      const splitter = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.36, 0.44), dark)
+      splitter.position.set(sx * 0.63, 0, -0.48)
+      bank.add(splitter)
+      const lip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.28, 0.34), steel)
+      lip.position.set(sx * 0.61, 0, 0.14)
+      bank.add(lip)
     }
 
+    // ---- hull stencils: flush service panels ----
+    const st1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.5), dark)
+    st1.position.set(0.1, -0.465, 0.25)
+    bank.add(st1)
+    const st2 = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.18, 0.42), red)
+    st2.position.set(-0.468, 0.12, -0.3)
+    bank.add(st2)
+
+    // ---- fins: swept extruded trapezoids, rolled around the body ----
+    /** Extruded fin plate. Shape: x=span from axis, y=chord (+ = tailward). */
+    const finGeo = (pts, depth) => {
+      const shape = new THREE.Shape()
+      shape.moveTo(pts[0][0], pts[0][1])
+      for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i][0], pts[i][1])
+      shape.closePath()
+      const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false })
+      g.translate(0, 0, -depth / 2) // centre thickness
+      return g
+    }
+    const rollFin = (geo, finMat2, z, tipPlate) => {
+      for (let k = 0; k < 4; k++) {
+        const holder = new THREE.Group()
+        holder.rotation.z = (k * Math.PI) / 2 // + cross config
+        const fin = new THREE.Mesh(geo, finMat2)
+        fin.rotation.x = Math.PI / 2 // shape y (chord) -> world +Z
+        holder.add(fin)
+        if (tipPlate) {
+          const tip = new THREE.Mesh(new THREE.BoxGeometry(
+            tipPlate[0], 0.1, tipPlate[1]), red)
+          tip.position.set(tipPlate[2], 0, tipPlate[3])
+          holder.add(tip)
+        }
+        holder.position.z = z
+        bank.add(holder)
+      }
+    }
+    // main delta fins — root rides the aft body (r 0.44), tip swept back
+    rollFin(finGeo([
+      [0.44, -0.85], [1.26, 0.26], [1.26, 0.60], [0.44, 0.82]
+    ], 0.075), finMat, 0.72, [0.3, 0.5, 1.3, 0.5])
+    // canards — small forward trapezoids on the reduced section (r 0.35)
+    rollFin(finGeo([
+      [0.35, -0.26], [0.82, 0.05], [0.82, 0.30], [0.35, 0.28]
+    ], 0.055), finMat, -1.5)
+
+    // ---- tail: mount ring, ablative collar, nozzle bell ----
+    const mount = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.31, 0.31, 0.16, 12), steel)
+    mount.rotation.x = Math.PI / 2
+    mount.position.z = 1.9
+    bank.add(mount)
+    const collar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.33, 0.33, 0.26, 12), dark)
+    collar.rotation.x = Math.PI / 2
+    collar.position.z = 1.62
+    bank.add(collar)
     const nozzle = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.24, 0.34, 0.35, 8),
-      mat(0x2b2e33, { metalness: 0.7, roughness: 0.35 })
-    )
-    nozzle.rotation.x = Math.PI / 2
-    nozzle.position.z = 1.52
+      new THREE.CylinderGeometry(0.37, 0.26, 0.44, 12), steel)
+    nozzle.rotation.x = Math.PI / 2 // wide end rearward
+    nozzle.position.z = 2.19
     bank.add(nozzle)
+    const inner = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.24, 0.24, 0.1, 12),
+      mat(0x1a1d21, { metalness: 0.8, roughness: 0.4 }))
+    inner.rotation.x = Math.PI / 2
+    inner.position.z = 2.28
+    bank.add(inner)
 
-    // --- exhaust glow — emissive core behind the nozzle ---
+    // ---- exhaust: emissive core cone + shock rings (thrust-reactive) ----
     const glowMat = new THREE.MeshStandardMaterial({
       color: 0xff8c3a, emissive: 0xff6a00, emissiveIntensity: 0.7, flatShading: true
     })
-    const glow = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.28), glowMat)
-    glow.position.z = 1.6
+    const glow = new THREE.Mesh(new THREE.ConeGeometry(0.27, 0.6, 10), glowMat)
+    glow.rotation.x = Math.PI / 2 // apex -> +Z (plume tapers rearward)
+    glow.position.z = 2.72
     bank.add(glow)
+    for (const [r, z] of [[0.16, 3.0], [0.1, 3.22]]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.024, 6, 14), glowMat)
+      ring.position.z = z
+      bank.add(ring)
+    }
     root.userData.glowMat = glowMat
 
     root.traverse((o) => { if (o.isMesh) o.castShadow = true })

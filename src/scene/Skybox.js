@@ -95,6 +95,28 @@ export class Skybox {
       this.mountains.add(m)
     }
 
+    // ---- stars (night palettes) ----
+    const starPos = new Float32Array(420 * 3)
+    for (let i = 0; i < 420; i++) {
+      // random upper-hemisphere directions at dome radius
+      const a = rnd(0, Math.PI * 2)
+      const y = rnd(0.06, 0.98)
+      const rXZ = Math.sqrt(1 - y * y)
+      starPos[i * 3] = Math.cos(a) * rXZ * 1320
+      starPos[i * 3 + 1] = y * 1320
+      starPos[i * 3 + 2] = Math.sin(a) * rXZ * 1320
+    }
+    const starGeo = new THREE.BufferGeometry()
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3))
+    this._starMat = new THREE.PointsMaterial({
+      color: 0xdfe8ff, size: 2.2, sizeAttenuation: false,
+      transparent: true, opacity: 0, depthWrite: false, fog: false
+    })
+    this._stars = new THREE.Points(starGeo, this._starMat)
+    this._stars.frustumCulled = false
+    this._stars.renderOrder = -9
+    this.group.add(this._stars)
+
     // ---- drifting cloud puffs ----
     this.clouds = new THREE.Group()
     this.group.add(this.clouds)
@@ -142,6 +164,7 @@ export class Skybox {
     this._mountainMat.color.set(p.mountainColor)
     this._cloudMat.color.set(p.cloudColor)
     this._cloudMat.opacity = p.cloudOpacity
+    this._starMat.opacity = p.stars || 0
   }
 
   /** Dome tracks the camera; clouds drift. @param {THREE.Vector3} camPos */

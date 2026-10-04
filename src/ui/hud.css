@@ -251,10 +251,14 @@
   color: rgba(232, 236, 241, 0.65);
 }
 #menu-cards {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 12px;
   width: min(560px, 94vw);
+}
+/* two columns once there is room — six levels stay one glance away */
+@media (min-width: 760px) {
+  #menu-cards { grid-template-columns: 1fr 1fr; width: min(760px, 92vw); }
 }
 .card {
   pointer-events: auto;
@@ -266,18 +270,20 @@
   text-align: left;
   background: rgba(14, 18, 24, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.18);
+  border-left: 3px solid var(--card-tint, #c9522f);
   transition: border-color 0.15s, transform 0.15s, background 0.15s;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 @media (hover: hover) and (pointer: fine) {
   .card:hover {
-    border-color: #ff6a2b;
+    border-color: var(--card-tint, #ff6a2b);
+    border-left-color: var(--card-tint, #ff6a2b);
     background: rgba(34, 24, 18, 0.92);
     transform: translateX(4px);
   }
 }
-.card:active { border-color: #ff6a2b; }
+.card:active { border-color: var(--card-tint, #ff6a2b); }
 .card-head {
   display: flex;
   align-items: center;
@@ -292,7 +298,7 @@
   font-size: 13px;
   font-weight: 800;
   color: #fff;
-  background: #c9522f;
+  background: var(--card-tint, #c9522f);
 }
 .card-name {
   flex: 1;
@@ -560,6 +566,11 @@ body.is-touch .obtn {
   font-size: 15px;
 }
 body.is-touch .card { min-height: 58px; }
+/* keep 6 cards reachable in landscape phones — two slim columns */
+@media (max-height: 460px) {
+  #menu-cards { grid-template-columns: 1fr 1fr; gap: 8px; width: min(680px, 94vw); }
+  .card { padding: 8px 12px; }
+}
 
 /* ---------- small desktop windows ---------- */
 @media (max-width: 760px) {

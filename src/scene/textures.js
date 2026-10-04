@@ -180,7 +180,108 @@ export function buildTextures () {
   })
   puff.wrapS = puff.wrapT = THREE.ClampToEdgeWrapping
 
-  CACHE = { concrete, dark, girder, hazard, accent, ground, puff }
+  // ---- building facades: day (glass with sky tint) + night (lit windows) ----
+  // One tile = 4 window columns x 6 floors. Facade body stays mid-grey so the
+  // palette tint dominates; glass varies per window so facades read at speed.
+  const facade = (night, litRatio) => canvasTex(256, (ctx, s) => {
+    const COLS = 4, ROWS = 6
+    const cw = s / COLS, ch = s / ROWS
+    ctx.fillStyle = night ? '#101318' : '#a7abb1'
+    ctx.fillRect(0, 0, s, s)
+    // concrete mullion grid
+    ctx.strokeStyle = night ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.28)'
+    ctx.lineWidth = 3
+    for (let c = 0; c <= COLS; c++) {
+      ctx.beginPath(); ctx.moveTo(c * cw, 0); ctx.lineTo(c * cw, s); ctx.stroke()
+    }
+    for (let r = 0; r <= ROWS; r++) {
+      ctx.beginPath(); ctx.moveTo(0, r * ch); ctx.lineTo(s, r * ch); ctx.stroke()
+    }
+    // spandrel band under each floor
+    ctx.fillStyle = night ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.18)'
+    for (let r = 0; r < ROWS; r++) ctx.fillRect(0, r * ch + ch * 0.72, s, ch * 0.28)
+    // windows
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        const x = c * cw + 4, y = r * ch + 3
+        const w = cw - 8, h = ch * 0.62
+        if (night) {
+          const lit = Math.random() < litRatio
+          if (lit) {
+            // warm / cool interior light
+            const warm = Math.random() < 0.6
+            const a = 0.55 + Math.random() * 0.45
+            ctx.fillStyle = warm
+              ? `rgba(255,${180 + (Math.random() * 50) | 0},${90 + (Math.random() * 60) | 0},${a})`
+              : `rgba(${150 + (Math.random() * 40) | 0},${200 + (Math.random() * 40) | 0},255,${a})`
+          } else {
+            ctx.fillStyle = 'rgba(18,22,30,0.9)'
+          }
+        } else {
+          // daylight glass: blue-grey with per-window brightness variation
+          const v = 118 + ((Math.random() * 54) | 0)
+          ctx.fillStyle = `rgb(${(v * 0.82) | 0},${(v * 0.94) | 0},${v + 24 > 255 ? 255 : v + 24})`
+        }
+        ctx.fillRect(x, y, w, h)
+      }
+    }
+    // weathering streaks on day facades
+    if (!night) {
+      for (let i = 0; i < 10; i++) {
+        const x = Math.random() * s
+        ctx.fillStyle = 'rgba(0,0,0,0.05)'
+        ctx.fillRect(x, 0, 2 + Math.random() * 3, s)
+      }
+    }
+  })
+  const windowsDay = facade(false, 0)
+  const windowsNight = facade(true, 0.34)
+
+  // ---- fine metal cladding for building trims / rooftop units ----
+  const metalPanel = canvasTex(256, (ctx, s) => {
+    ctx.fillStyle = '#9298a0'
+    ctx.fillRect(0, 0, s, s)
+    for (let y = 0; y < s; y += 16) {
+      ctx.fillStyle = y % 32 === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'
+      ctx.fillRect(0, y, s, 1)
+    }
+    for (let x = 0; x < s; x += 32) {
+      ctx.fillStyle = 'rgba(0,0,0,0.10)'
+      ctx.fillRect(x, 0, 1, s)
+    }
+    stains(ctx, s, 4, 'rgba(70,60,40,0.12)')
+    speckle(ctx, s, 600, 0.5, 0.07)
+  })
+
+  // ---- lava / emissive fault lines (volcanic level) ----
+  const lava = canvasTex(256, (ctx, s) => {
+    ctx.fillStyle = '#141210'
+    ctx.fillRect(0, 0, s, s)
+    // branching glowing cracks
+    for (let i = 0; i < 9; i++) {
+      let x = Math.random() * s
+      let y = Math.random() * s
+      ctx.lineWidth = 1 + Math.random() * 2.4
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      const segs = 5 + ((Math.random() * 6) | 0)
+      for (let k = 0; k < segs; k++) {
+        x += rnd(-46, 46); y += rnd(-46, 46)
+        ctx.lineTo(x, y)
+      }
+      const hot = Math.random() < 0.5 ? '#ff5a1e' : '#ff9d2e'
+      ctx.strokeStyle = hot
+      ctx.globalAlpha = 0.85
+      ctx.stroke()
+      ctx.globalAlpha = 0.35
+      ctx.lineWidth *= 2.6
+      ctx.stroke()
+      ctx.globalAlpha = 1
+    }
+    speckle(ctx, s, 500, 0.5, 0.1)
+  })
+
+  CACHE = { concrete, dark, girder, hazard, accent, ground, puff, windowsDay, windowsNight, metalPanel, lava }
   return CACHE
 }
 

@@ -1,6 +1,6 @@
 /**
  * DUMBFIRE — playable web prototype.
- * Inertia-heavy missile flight + grapple-hook slinging across three courses.
+ * Inertia-heavy missile flight + grapple-hook slinging across six courses.
  *
  * Stack: Vite + three.js (rendering) + Rapier3D (physics, compat build).
  *
@@ -25,8 +25,11 @@ import { CFG } from './config.js'
 import { LEVEL_1 } from './scene/levels/level1.js'
 import { LEVEL_2 } from './scene/levels/level2.js'
 import { LEVEL_3 } from './scene/levels/level3.js'
+import { LEVEL_4 } from './scene/levels/level4.js'
+import { LEVEL_5 } from './scene/levels/level5.js'
+import { LEVEL_6 } from './scene/levels/level6.js'
 
-const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3]
+const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6]
 
 // ---- device profile ---------------------------------------------------------
 // Coarse pointer and no fine pointer => touch-first device. Force with ?touch=1.

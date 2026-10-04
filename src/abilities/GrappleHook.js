@@ -179,7 +179,7 @@ export class GrappleHook {
     this.anchorMesh.rotation.x += 0.017
 
     const m = this.missile
-    _tail.set(0, 0, 1.6).applyQuaternion(m.quaternion).add(m.position) // local +Z = tail
+    _tail.set(0, 0, 2.2).applyQuaternion(m.quaternion).add(m.position) // local +Z = tail
     _dir.copy(this.anchor).sub(_tail)
     const len = Math.max(_dir.length(), 0.001)
     _dir.multiplyScalar(1 / len)
